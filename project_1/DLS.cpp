@@ -10,7 +10,7 @@ SearchResult solveDLS(const Board& startState, const Board& goalState, int depth
 
     std::stack<Node> frontier;
 
- Node startNode;
+    Node startNode;
     startNode.board = startState;
     startNode.path = "";
     startNode.depth = 0;
@@ -36,11 +36,6 @@ SearchResult solveDLS(const Board& startState, const Board& goalState, int depth
         if (current.depth >= depthLimit) {
             continue;
         }
-
-//         Use a one-move puzzle with limit 0: solution should not be found.
-// Use the same puzzle with limit 1: solution should be found.
-// Use a two-move puzzle with limit 1: solution should not be found.
-// Use that puzzle with limit 2: solution should be found.
 
         for (const Node& child : successors(current)) {
             frontier.push(child);

@@ -98,12 +98,16 @@ int main() {
     if (choice == 1) {
         SearchResult result = solveBFS(_startState, _goalState);
 
+        std::cout << "\n";
+
         std::cout << "=== BFS ===" << "\n\n";
 
         printResult(result);
     }
     else if (choice == 2) {
         SearchResult result = solveIDS(_startState, _goalState);
+
+        std::cout << "\n";
 
         std::cout << "=== IDS ===" << "\n\n";
 
@@ -112,11 +116,15 @@ int main() {
     else if (choice ==3) {
         SearchResult bfsResult = solveBFS(_startState, _goalState);
 
+        std::cout << "\n";
+
         std::cout << "=== BFS ===" << "\n\n";
 
         printResult(bfsResult);
 
         SearchResult idsResult = solveIDS(_startState, _goalState);
+
+        std::cout << "\n";
 
         std::cout << "=== IDS ===" << "\n\n";
 
@@ -125,9 +133,16 @@ int main() {
         else if (choice == 4) {
         int depthLimit;
 
+        std::cout << "\n";
+
         std::cout << "Enter depth limit: ";
+
+        std::cout << "\n";
+        
         std::cin >> depthLimit;
         SearchResult result = solveDLS(_startState, _goalState, depthLimit);
+
+        std::cout << "\n";
 
         std::cout << "=== DLS ===" << "\n\n";
 
