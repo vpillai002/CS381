@@ -1,0 +1,14 @@
+# C++ build artifacts
+*.o
+*.out
+*.exe
+*.app
+project1
+puzzle
+test_successors
+build/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
