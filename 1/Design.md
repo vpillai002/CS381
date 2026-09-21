@@ -351,12 +351,12 @@ A C++ version of the project was coded with AI suppport by Will Meyer, but that 
 
 **Vishnu Pillai**
 
-- Project lead - Designed and built the project from scratch in Python.
+- Designed and built the project from scratch in Python.
 - Supported Will with understanding the project control flow and overall structure of the program.
 - Wrote the design and pseudocode sections of the final project documentation.
 
 **Will Meyer**
 
-- Project support - Designed and built the project from scratch in C++, his primary coding language. 
+- Designed and built the project from scratch in C++, his primary coding language. 
 - Added comments to the Python submission file for better understanding and readability.
 - Created the outline and overall structure for the final project documentation.
