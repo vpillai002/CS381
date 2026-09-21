@@ -3,6 +3,6 @@
 
 #include "puzzle.hpp"
 
-SearchResult solveIDS(const Board& startState, const Board& goalState);
+SearchResult solveIDS(const Board& startState, const Board& goalState, int maxLimit = 30);
 
 #endif

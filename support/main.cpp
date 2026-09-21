@@ -122,7 +122,7 @@ int main() {
 
         printResult(bfsResult);
 
-        SearchResult idsResult = solveIDS(_startState, _goalState);
+        SearchResult idsResult = solveIDS(_startState, _goalState, 30);
 
         std::cout << "\n";
 
