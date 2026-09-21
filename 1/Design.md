@@ -323,3 +323,40 @@ The automated suite contains both focused unit tests and deeper behavioral tests
 - the already-solved input for BFS, DLS, and IDS.
 
 The deeper cases are useful because they exercise multiple search levels and compare the algorithms, while the small cases make individual failures easier to diagnose. The 8-move board is a meaningful test without making the required tree-search implementation excessively expensive.
+
+### File Structure
+
+The project files are organized as follows:
+
+```text
+1/
+├── Design.md
+├── ai_transcript.md
+├── project1-Fa26.pdf
+├── project1.py
+└── test_search.py
+```
+
+### AI Support
+
+The Python project was coded without the use of AI.
+
+A C++ version of the project was coded with AI suppport by Will Meyer, but that version will not be submitted for grading. Will was able to build a rudimentary scaffold of the project that took input and produced output asking the user to input the desired algorithm. At that point, AI assistance was used to implement the actual search algorithms within their respective header files. In addition, program testing was supported by AI.
+
+**The AI transcript for that project can be found in the file:**
+
+- 1/ai_transcript.md
+
+### Team Member Roles
+
+**Vishnu Pillai**
+
+- Project lead - Designed and built the project from scratch in Python.
+- Supported Will with understanding the project control flow and overall structure of the program.
+- Wrote the design and pseudocode sections of the final project documentation.
+
+**Will Meyer**
+
+- Project support - Designed and built the project from scratch in C++, his primary coding language. 
+- Added comments to the Python submission file for better understanding and readability.
+- Created the outline and overall structure for the final project documentation.
