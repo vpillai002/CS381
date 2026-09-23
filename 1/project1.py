@@ -3,7 +3,8 @@ import sys
 import time
 from collections import deque
 
-BOARD_SIZE = 4
+# make n, and prompt user for board size value
+BOARD_SIZE = None
 MOVE_ORDER = ("U", "D", "L", "R")
 
 
@@ -55,8 +56,10 @@ def parse_board(raw_text):
 
     # Reject bad boards before the search begins.
     if not validate_board(board):
-        raise ValueError("Board must be a 4x4 list with numbers 0 through 15 exactly once.")
-
+        raise ValueError(
+            f"Board must be a {BOARD_SIZE}x{BOARD_SIZE} list with numbers "
+            f"0 through {BOARD_SIZE * BOARD_SIZE - 1} exactly once."
+        )
     # Store board states in nested tuples.
     return tuple(tuple(row) for row in board)
 
@@ -293,9 +296,14 @@ def read_user_board(prompt_text):
 
 # Run the interactive program from input prompts to search results.
 def run_cli():
+    global BOARD_SIZE
+    BOARD_SIZE = int(input("Enter board size n: "))
+    if BOARD_SIZE < 1:
+        raise ValueError("Board size must be at least 1.")
+
     # Explain the puzzle and show the expected board format.
     print("Sliding Tile Puzzle Search")
-    print("Enter boards as nested 4x4 lists, for example:")
+    print("Enter boards as nested {BOARD_SIZE}x{BOARD_SIZE} lists.")
     print("[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 0]]")
 
     # Read and validate both boards before choosing a search method.
