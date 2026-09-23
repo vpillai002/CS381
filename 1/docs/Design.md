@@ -330,9 +330,10 @@ The project files are organized as follows:
 
 ```text
 1/
-├── Design.md
-├── ai_transcript.md
-├── project1-Fa26.pdf
+├──/docs
+    ├── Design.md
+    ├── ai_transcript.md
+    ├── project1-Fa26.pdf
 ├── project1.py
 └── test_search.py
 ```
