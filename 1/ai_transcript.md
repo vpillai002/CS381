@@ -1,6 +1,6 @@
 # AI Transcript
 
-The following transcript shows the AI assistance Will Meyer used to code the C++ version of the project. 
+The following transcript shows the AI assistance Will Meyer used to code the C++ version of the project, and at the very end, a short transcript to modify the python submission version to accept any BOARD_SIZE. 
 
 ### Evaluate CS381 project status
 
@@ -1985,3 +1985,275 @@ SearchResult result = solveIDS(_startState, _goalState);
 ```
 
 because the default value is now visible through `IDS.hpp`.
+
+# Explain variable board size input
+
+> Turns out we need to make this program accept any size board. Here it is:
+>
+> /Users/willm/school\_projects/cs381\_intro\_to\_ai/projects/p\_1/1/project1.py
+>
+> *# make n, and prompt user for board size value*
+>
+> I don't have python experience and we are allowed to use ai. Tellme what to type. Don't change it on your own.
+
+<details><summary>1 previous message</summary>
+
+> I’ll inspect the surrounding code so I can tell you exactly what to type and where, without modifying the file.
+</details>
+
+Make these three edits.
+
+1. Replace:
+
+```python
+# make n, and prompt user for board size value
+BOARD_SIZE = 4
+```
+
+with:
+
+```python
+# The board will be BOARD_SIZE x BOARD_SIZE.
+BOARD_SIZE = None
+```
+
+2. In `run_cli()`, immediately after:
+
+```python
+def run_cli():
+```
+
+add:
+
+```python
+    global BOARD_SIZE
+    BOARD_SIZE = int(input("Enter board size n: "))
+
+    if BOARD_SIZE < 1:
+        raise ValueError("Board size must be at least 1.")
+```
+
+3. Replace this line:
+
+```python
+print("Enter boards as nested 4x4 lists, for example:")
+```
+
+with:
+
+```python
+print(f"Enter boards as nested {BOARD_SIZE}x{BOARD_SIZE} lists.")
+```
+
+Also replace the validation error:
+
+```python
+raise ValueError("Board must be a 4x4 list with numbers 0 through 15 exactly once.")
+```
+
+with:
+
+```python
+raise ValueError(
+    f"Board must be a {BOARD_SIZE}x{BOARD_SIZE} list with numbers "
+    f"0 through {BOARD_SIZE * BOARD_SIZE - 1} exactly once."
+)
+```
+
+Then, when you run it, type a size first, such as:
+
+```text
+Enter board size n: 3
+```
+
+For a 3×3 board, use numbers `0` through `8`, for example:
+
+```text
+[[1, 2, 3], [4, 5, 6], [7, 8, 0]]
+```
+
+The program will now accept 1×1, 2×2, 3×3, 4×4, and larger boards. BFS and IDS can become extremely slow for larger boards.
+
+> Ok, i just made changes to the main branch. I probably should have pulled in first from main git. Anyway to get around this?
+
+<details><summary>1 previous message</summary>
+
+> I’ll check the repository status and branch history first. I won’t change anything; then I’ll give you the safest exact commands based on what Git shows.
+</details>
+
+You’re okay. Git shows:
+
+- You are on `main`.
+- Your local `main` currently matches `origin/main`.
+- Your changes are uncommitted: `project1.py` and `support/`.
+
+To safely check for newer remote changes while preserving yours, type:
+
+```bash
+cd /Users/willm/school_projects/cs381_intro_to_ai/projects/p_1
+git stash push -u -m "my project 1 changes"
+git pull --rebase origin main
+git stash pop
+```
+
+The `-u` includes the untracked `support/` folder.
+
+If `git stash pop` reports conflicts, do not panic. Open the conflicted file, choose the correct version, save it, then run:
+
+```bash
+git add .
+git commit -m "Update project 1 for variable board sizes"
+```
+
+If the pull says “Already up to date,” everything is fine.
+
+> willm\@Wills-MacBook-Pro 1 % cd /Users/willm/school\_projects/cs381\_intro\_to\_ai/projects/p\_1
+> git stash push -u -m "my project 1 changes"
+> git pull --rebase origin main
+> git stash pop
+> Saved working directory and index state On main: my project 1 changes
+> From github.com:vpillai002/CS381
+> &#x20;\* branch            main       -> FETCH\_HEAD
+> Already up to date.
+> On branch main
+> Your branch is up to date with 'origin/main'.
+>
+> Changes not staged for commit:
+> &#x20; (use "git add \<file>..." to update what will be committed)
+> &#x20; (use "git restore \<file>..." to discard changes in working directory)
+> &#x20;       modified:   1/project1.py
+>
+> Untracked files:
+> &#x20; (use "git add \<file>..." to include in what will be committed)
+> &#x20;       support/
+>
+> no changes added to commit (use "git add" and/or "git commit -a")
+> Dropped refs/stash@{0} (02393b3a7389649f02eab7d5477df9db3f5f7ce0)
+
+Everything worked successfully.
+
+- Git confirmed `main` was already up to date.
+- Your changes were restored.
+- The stash was safely dropped after restoration.
+
+Now review your changes:
+
+```bash
+git diff -- 1/project1.py
+git status
+```
+
+If everything looks correct, save them to Git:
+
+```bash
+git add 1/project1.py
+git add support/
+git commit -m "Support variable-sized boards"
+git push origin main
+```
+
+Only add `support/` if those files belong in your project.
+
+> diff --git a/1/project1.py b/1/project1.py
+> index abfe4e3..f32366d 100644
+> \--- a/1/project1.py
+> +++ b/1/project1.py
+> @@ -3,7 +3,8 @@ import sys
+> &#x20;import time
+> &#x20;from collections import deque
+> &#x20;
+> -BOARD\_SIZE = 4
+> +# make n, and prompt user for board size value
+> +BOARD\_SIZE = None
+> &#x20;MOVE\_ORDER = ("U", "D", "L", "R")
+> &#x20;
+> &#x20;
+> @@ -55,8 +56,10 @@ def parse\_board(raw\_text):
+> &#x20;
+> &#x20;    \# Reject bad boards before the search begins.
+
+That diff shows you changed `BOARD_SIZE` to `None`, but you still need to assign the user’s chosen size.
+
+Inside `run_cli()`, immediately after:
+
+```python
+def run_cli():
+```
+
+add:
+
+```python
+    global BOARD_SIZE
+    BOARD_SIZE = int(input("Enter board size n: "))
+
+    if BOARD_SIZE < 1:
+        raise ValueError("Board size must be at least 1.")
+```
+
+Also change any remaining text that says `4x4` or `0 through 15` to use `BOARD_SIZE` dynamically. Otherwise the program will still display incorrect instructions even if the code accepts another size.
+
+> i did make those changes. It looks like vim just stops and doesn't show anything else. do I have to page down?
+
+Yes. `git diff` may open in a pager.
+
+Use:
+
+- `Space` — page down
+- `j` or Down Arrow — move down
+- `b` — page up
+- `G` — jump to the end
+- `q` — quit and return to the terminal
+
+If it is actually Vim and `q` does not work, type:
+
+```text
+:q
+```
+
+then press Enter.
+
+> ok, looks like all my diffs are there. How do I accept?
+
+To accept/save the changes in Git, commit them:
+
+```bash
+git add 1/project1.py
+```
+
+If `support/` belongs in the project, also run:
+
+```bash
+git add support/
+```
+
+Review what will be committed:
+
+```bash
+git diff --cached
+```
+
+Then commit:
+
+```bash
+git commit -m "Support variable-sized boards"
+```
+
+Finally, upload the commit to GitHub:
+
+```bash
+git push origin main
+```
+
+`commit` saves the changes locally; `push` sends them to the remote `main` branch.
+
+> first, how do I just get out of vim without changing anything.
+
+Press `Esc`, then type:
+
+```text
+:q!
+```
+
+Press Enter.
+
+This exits Vim without saving changes.
