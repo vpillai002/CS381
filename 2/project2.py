@@ -114,11 +114,73 @@ def generate_moves(state, parent=None):
 
     return moves
 
-# NEW PROJECT 2 STUFF WILL GO HERE
-# h1()
-# h2 setup
-# h3()
-# best_first_search()
+# TODO Project 2: add a function for heuristic h1.
+# For every numbered tile, find its row and column in the goal state.
+# Add the Manhattan distance from the tile's current position to that goal
+# position. Do not include the blank tile in the sum.
+def h1(state, goal):
+    total = 0
+
+    for r in range(len(state)):
+        for c in range(len(state[r])):
+
+            tile = state[r][c]
+
+            if tile == 0:
+                continue
+
+            for goal_r in range(len(goal)):
+                for goal_c in range(len(goal[goal_r])):
+
+                    if tile == goal[goal_r][goal_c]:
+
+                        # TODO 1: Calculate Manhattan distance
+                        # between (r, c) and (goal_r, goal_c).
+                        distance = abs(r - goal_r) + abs(c - goal_c)
+
+                        # TODO 2: Add distance to total.
+                        total += distance
+
+    return total
+
+
+
+
+
+# TODO Project 2: add the red/green abstraction used by heuristic h2.
+# Map tiles 1 through 8 to one value, tiles 9 through 15 to another value,
+# and keep the blank as its own value. Return the mapped board in a hashable
+# form so it can be used as a dictionary key.
+
+# TODO Project 2: build the h2 lookup table once for the selected goal.
+# Map the goal board, then search outward from that mapped goal until every
+# reachable red/green board has a distance. Store each distance in a table.
+# The table should contain distances for all 102,960 abstract board states.
+
+# TODO Project 2: add h2(state, goal, h2_table).
+# Map the original state in the same way as the goal and read its distance
+# from the precomputed table. Build the table before the first h2 search.
+
+# TODO Project 2: add h3(state, goal, h2_table).
+# Return the larger of h1(state, goal) and h2(state, goal, h2_table).
+
+# TODO Project 2: add a generic best_first_search(start, goal, heuristic).
+# Use a priority queue for OPEN and a set or dictionary for CLOSED so each
+# board state is handled as a graph-search state rather than a tree node.
+# Each queue entry should retain enough parent or path information to rebuild
+# the move string when the goal is found.
+
+# TODO Project 2: define the priority and tie-breaking rules for OPEN.
+# Rank a state by its heuristic value and keep move generation in U, D, L, R
+# order so equal-priority results are deterministic.
+
+# TODO Project 2: record the required search statistics.
+# Count states when they are removed from OPEN, track the largest OPEN size,
+# and measure CPU time around the search. Return the same keys used by
+# format_result.
+
+# TODO Project 2: decide how the h2 table is cached when the goal changes.
+# A table is valid only for the mapped goal currently being searched.
 
 # Turn a search result dictionary into readable output.
 def format_result(label, result):
@@ -170,10 +232,23 @@ def run_cli():
     start = read_user_board("Start state: ")
     goal = read_user_board("Goal state: ")
 
-    # Let the user select which search algorithm to run.
+    # TODO Project 2: replace the Project 1 menu with options 1, 2, 3, and 5.
+    # Options 1, 2, and 3 run best-first search with h1, h2, and h3.
+    # Accept combinations such as 123, and keep prompting until the user
+    # enters 5 to halt. Avoid running the same option twice in one choice.
     choice = input(
         "Choose algorithm: (1) BFS (2) IDS (3) BFS and IDS (4) DLS: "
     ).strip()
+
+    # TODO Project 2: replace these Project 1 branches with the new loop.
+    # Prepare h2's abstraction table only when h2 or h3 is requested, then
+    # call best_first_search with the selected heuristic for each digit.
+    # Print each result with a label that identifies h1, h2, or h3.
+    # The final menu should offer 1, 2, 3, and 5, and accept combinations
+    # such as 123 before prompting again until the user chooses 5.
+
+    # TODO Project 2: validate menu input before searching.
+    # Reject letters, repeated digits, and digits outside 1, 2, 3, and 5.
 
     # Run BFS and display its formatted result.
     if choice == "1":
@@ -208,3 +283,13 @@ if __name__ == "__main__":
     except ValueError as exc:
         print(f"Input error: {exc}")
         sys.exit(1)
+
+
+# TODO Project 2 submission checklist:
+# Document each function's inputs, outputs, and preconditions.
+# Explain the board representation, priority queue, CLOSED structure, and h2 table.
+# Add compilation and execution instructions to the design documentation.
+# Include a start/goal pair whose solution requires at least 30 moves.
+# Run that pair with options 123 and record the required output.
+# Describe which code was produced with AI and include the complete transcript.
+# Record each teammate's role.
