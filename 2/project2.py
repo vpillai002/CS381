@@ -1,10 +1,13 @@
 import ast
+import heapq
 import sys
 import time
 from collections import deque
+from functools import lru_cache
+from itertools import count
 
-# make n, and prompt user for board size value
-BOARD_SIZE = None
+# Project 2 specifies the 4x4 sliding-tile puzzle.
+BOARD_SIZE = 4
 MOVE_ORDER = ("U", "D", "L", "R")
 
 
@@ -114,11 +117,206 @@ def generate_moves(state, parent=None):
 
     return moves
 
-# NEW PROJECT 2 STUFF WILL GO HERE
-# h1()
-# h2 setup
-# h3()
-# best_first_search()
+def h1(state, goal):
+    """Return the Manhattan-distance sum for numbered tiles.
+
+    Inputs: start/search state and goal state as square sequences.
+    Output: nonnegative integer distance, excluding the blank tile.
+    Preconditions: both states have the same valid square shape and tile set.
+    """
+    goal_positions = {
+        tile: (row_index, column_index)
+        for row_index, row in enumerate(goal)
+        for column_index, tile in enumerate(row)
+    }
+    distance = 0
+    for row_index, row in enumerate(state):
+        for column_index, tile in enumerate(row):
+            if tile != 0:
+                goal_row, goal_column = goal_positions[tile]
+                distance += abs(row_index - goal_row) + abs(column_index - goal_column)
+    return distance
+
+
+def _abstract_state(state):
+    """Map tiles to blank, red, or green categories for heuristic 2."""
+    red_tile_limit = BOARD_SIZE * BOARD_SIZE // 2
+    return tuple(
+        0 if tile == 0 else 1 if tile <= red_tile_limit else 2
+        for row in state
+        for tile in row
+    )
+
+
+def _abstract_neighbors(state, size):
+    """Yield abstract boards reachable by one legal blank swap."""
+    blank_index = state.index(0)
+    row_index, column_index = divmod(blank_index, size)
+    neighbor_indices = []
+    if row_index + 1 < size:
+        neighbor_indices.append(blank_index + size)
+    if row_index > 0:
+        neighbor_indices.append(blank_index - size)
+    if column_index + 1 < size:
+        neighbor_indices.append(blank_index + 1)
+    if column_index > 0:
+        neighbor_indices.append(blank_index - 1)
+
+    for neighbor_index in neighbor_indices:
+        next_state = list(state)
+        next_state[blank_index], next_state[neighbor_index] = (
+            next_state[neighbor_index],
+            next_state[blank_index],
+        )
+        yield tuple(next_state)
+
+
+@lru_cache(maxsize=4)
+def _build_h2_database(abstract_goal, size):
+    """Build exact abstract distances from the goal using breadth-first search."""
+    distances = {abstract_goal: 0}
+    frontier = deque([abstract_goal])
+    while frontier:
+        state = frontier.popleft()
+        next_distance = distances[state] + 1
+        for neighbor in _abstract_neighbors(state, size):
+            if neighbor not in distances:
+                distances[neighbor] = next_distance
+                frontier.append(neighbor)
+    return distances
+
+
+def h2(state, goal):
+    """Return the exact distance in the red/green abstract puzzle.
+
+    Inputs: start/search state and goal state as square sequences.
+    Output: nonnegative integer abstract distance.
+    Preconditions: both states are valid boards of the same size.
+    """
+    abstract_goal = _abstract_state(goal)
+    distances = _build_h2_database(abstract_goal, len(goal))
+    return distances[_abstract_state(state)]
+
+
+def h3(state, goal):
+    """Return the maximum of Manhattan distance and abstract distance."""
+    return max(h1(state, goal), h2(state, goal))
+
+
+def is_solvable(start, goal):
+    """Return whether start and goal share the sliding puzzle's parity class."""
+    size = len(start)
+    goal_order = {
+        tile: rank
+        for rank, tile in enumerate(tile for row in goal for tile in row if tile != 0)
+    }
+
+    def inversion_parity(state):
+        ordered_tiles = [goal_order[tile] for row in state for tile in row if tile != 0]
+        inversions = sum(
+            ordered_tiles[left] > ordered_tiles[right]
+            for left in range(len(ordered_tiles))
+            for right in range(left + 1, len(ordered_tiles))
+        )
+        return inversions % 2
+
+    if size % 2:
+        return inversion_parity(start) == inversion_parity(goal)
+
+    def blank_row_from_bottom(state):
+        blank_row = next(row_index for row_index, row in enumerate(state) if 0 in row)
+        return size - blank_row
+
+    start_parity = (inversion_parity(start) + blank_row_from_bottom(start)) % 2
+    goal_parity = (inversion_parity(goal) + blank_row_from_bottom(goal)) % 2
+    return start_parity == goal_parity
+
+
+def _failed_result(start_time, max_queue_size=0, expanded=0):
+    return {
+        "found": False,
+        "moves": "",
+        "expanded": expanded,
+        "max_queue_size": max_queue_size,
+        "time_taken": time.process_time() - start_time,
+    }
+
+
+def best_first_search(start, goal, heuristic):
+    """Run graph-based A* and return the optimal move sequence and metrics.
+
+    Inputs: start board, goal board, and a heuristic callable(state, goal).
+    Output: result dictionary with found, moves, expanded, max_queue_size,
+    and time_taken keys. Each move names the direction its tile slides.
+    Preconditions: start and goal are valid boards of equal square size;
+    heuristic is admissible for unit-cost moves.
+    """
+    start = tuple(tuple(row) for row in start)
+    goal = tuple(tuple(row) for row in goal)
+    start_time = time.process_time()
+
+    if not is_solvable(start, goal):
+        return _failed_result(start_time)
+
+    insertion_order = count()
+    start_h = heuristic(start, goal)
+    start_tie_breaker = h1(start, goal)
+    frontier = [(start_h, start_tie_breaker, next(insertion_order), 0, start)]
+    open_costs = {start: 0}
+    closed_costs = {}
+    parent = {}
+    best_cost = {start: 0}
+    max_queue_size = 1
+    expanded = 0
+
+    while frontier:
+        _, _, _, path_cost, state = heapq.heappop(frontier)
+        if open_costs.get(state) != path_cost:
+            continue
+
+        del open_costs[state]
+        closed_costs[state] = path_cost
+        expanded += 1
+
+        if is_goal(state, goal):
+            moves = []
+            while state != start:
+                state, move = parent[state]
+                moves.append(move)
+            return {
+                "found": True,
+                "moves": "".join(reversed(moves)),
+                "expanded": expanded,
+                "max_queue_size": max_queue_size,
+                "time_taken": time.process_time() - start_time,
+            }
+
+        for move, neighbor in generate_moves(state):
+            new_cost = path_cost + 1
+            if new_cost >= best_cost.get(neighbor, float("inf")):
+                continue
+
+            best_cost[neighbor] = new_cost
+            parent[neighbor] = (state, move)
+            if neighbor in closed_costs:
+                del closed_costs[neighbor]
+
+            neighbor_h = heuristic(neighbor, goal)
+            tie_breaker = h1(neighbor, goal)
+            open_costs[neighbor] = new_cost
+            heapq.heappush(
+                frontier,
+                (
+                    new_cost + neighbor_h,
+                    tie_breaker,
+                    next(insertion_order),
+                    new_cost,
+                    neighbor,
+                ),
+            )
+            max_queue_size = max(max_queue_size, len(open_costs))
+
+    return _failed_result(start_time, max_queue_size, expanded)
 
 # Turn a search result dictionary into readable output.
 def format_result(label, result):
@@ -157,47 +355,30 @@ def read_user_board(prompt_text):
 # Run the interactive program from input prompts to search results.
 def run_cli():
     global BOARD_SIZE
-    BOARD_SIZE = int(input("Enter board size n: "))
-    if BOARD_SIZE < 1:
-        raise ValueError("Board size must be at least 1.")
+    BOARD_SIZE = 4
 
-    # Explain the puzzle and show the expected board format.
     print("Sliding Tile Puzzle Search")
-    print("Enter boards as nested {BOARD_SIZE}x{BOARD_SIZE} lists.")
+    print("Enter boards as nested 4x4 lists.")
     print("[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 0]]")
 
-    # Read and validate both boards before choosing a search method.
     start = read_user_board("Start state: ")
     goal = read_user_board("Goal state: ")
 
-    # Let the user select which search algorithm to run.
-    choice = input(
-        "Choose algorithm: (1) BFS (2) IDS (3) BFS and IDS (4) DLS: "
-    ).strip()
+    heuristics = {"1": h1, "2": h2, "3": h3}
+    while True:
+        choice = input(
+            "Choose heuristic(s): 1=h1, 2=h2, 3=h3; enter 4 or 5 to halt: "
+        ).strip()
+        if choice in {"4", "5"}:
+            break
+        if not choice or any(option not in heuristics for option in choice):
+            print("Invalid choice. Enter any combination of 1, 2, and 3, or 4 to halt.")
+            continue
 
-    # Run BFS and display its formatted result.
-    if choice == "1":
-        result = bfs(start, goal)
-        print(format_result("BFS", result))
-    # Run IDS and display its formatted result.
-    elif choice == "2":
-        result = ids(start, goal)
-        print(format_result("IDS", result))
-    # Run both searches so their results can be compared.
-    elif choice == "3":
-        bfs_result = bfs(start, goal)
-        print(format_result("BFS", bfs_result))
-        print()
-        ids_result = ids(start, goal)
-        print(format_result("IDS", ids_result))
-    # Read a depth limit, then run depth-limited search.
-    elif choice == "4":
-        depth = int(input("Enter DLS depth limit: "))
-        result = dls(start, goal, depth)
-        print(format_result("DLS", result))
-    # Handle choices outside the four supported options.
-    else:
-        print("Invalid choice. Please enter 1, 2, 3, or 4.")
+        for option in choice:
+            label = f"Best-first search (h{option})"
+            result = best_first_search(start, goal, heuristics[option])
+            print(format_result(label, result))
 
 
 if __name__ == "__main__":
