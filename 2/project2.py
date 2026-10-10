@@ -152,10 +152,38 @@ def h1(state, goal):
 # and keep the blank as its own value. Return the mapped board in a hashable
 # form so it can be used as a dictionary key.
 
+def map_tile(tile):
+    if tile == 0:
+        return 0
+    elif 1 <= tile <= 8:
+        return 1 # red
+    else:
+        return 2 # green
+
+
 # TODO Project 2: build the h2 lookup table once for the selected goal.
 # Map the goal board, then search outward from that mapped goal until every
 # reachable red/green board has a distance. Store each distance in a table.
 # The table should contain distances for all 102,960 abstract board states.
+def map_board(state):
+    mapped = []
+
+    for row in state:
+        new_row = []
+
+        for tile in row:
+            mapped_tile = map_tile(tile)
+
+            # TODO 1:
+            # Append mapped_tile to new_row.
+            new_row.append(mapped_tile)
+
+        # TODO 2:
+        # Append the completed new_row to mapped.
+        mapped.append(new_row)
+
+    return tuple(tuple(row) for row in mapped)
+
 
 # TODO Project 2: add h2(state, goal, h2_table).
 # Map the original state in the same way as the goal and read its distance
