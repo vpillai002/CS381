@@ -184,13 +184,32 @@ def map_board(state):
 
     return tuple(tuple(row) for row in mapped)
 
+def build_h2_table(goal):
+    distances = {goal: 0}
+    queue = deque([goal])
+
+    while queue:
+        current_state = queue.popleft()
+
+        for move, next_state in generate_moves(current_state):
+            if next_state not in distances:
+                distances[next_state] = distances[current_state] + 1
+                queue.append(next_state)
+
+    return distances
 
 # TODO Project 2: add h2(state, goal, h2_table).
 # Map the original state in the same way as the goal and read its distance
 # from the precomputed table. Build the table before the first h2 search.
+def h2(state, goal, h2_table):
+    abstract_state = map_board(state)
+    distance = h2_table[abstract_state]
+    return distance
 
 # TODO Project 2: add h3(state, goal, h2_table).
 # Return the larger of h1(state, goal) and h2(state, goal, h2_table).
+def h3(state, goal):
+    return max(h1(state, goal), h2(state, goal))
 
 # TODO Project 2: add a generic best_first_search(start, goal, heuristic).
 # Use a priority queue for OPEN and a set or dictionary for CLOSED so each
