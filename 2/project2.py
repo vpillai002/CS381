@@ -2,6 +2,7 @@ import ast
 import sys
 import time
 from collections import deque
+import heapq
 
 # make n, and prompt user for board size value
 BOARD_SIZE = None
@@ -114,10 +115,7 @@ def generate_moves(state, parent=None):
 
     return moves
 
-# TODO Project 2: add a function for heuristic h1.
-# For every numbered tile, find its row and column in the goal state.
-# Add the Manhattan distance from the tile's current position to that goal
-# position. Do not include the blank tile in the sum.
+# Calculate h1 as the sum of Manhattan distances for all nonblank tiles.
 def h1(state, goal):
     total = 0
 
@@ -134,11 +132,11 @@ def h1(state, goal):
 
                     if tile == goal[goal_r][goal_c]:
 
-                        # TODO 1: Calculate Manhattan distance
+                        # Calculate Manhattan distance
                         # between (r, c) and (goal_r, goal_c).
                         distance = abs(r - goal_r) + abs(c - goal_c)
 
-                        # TODO 2: Add distance to total.
+                        # Add distance to total.
                         total += distance
 
     return total
@@ -147,11 +145,7 @@ def h1(state, goal):
 
 
 
-# TODO Project 2: add the red/green abstraction used by heuristic h2.
-# Map tiles 1 through 8 to one value, tiles 9 through 15 to another value,
-# and keep the blank as its own value. Return the mapped board in a hashable
-# form so it can be used as a dictionary key.
-
+# Map numbered tiles to Red/Green categories while preserving a hashable board.
 def map_tile(tile):
     if tile == 0:
         return 0
@@ -160,11 +154,7 @@ def map_tile(tile):
     else:
         return 2 # green
 
-
-# TODO Project 2: build the h2 lookup table once for the selected goal.
-# Map the goal board, then search outward from that mapped goal until every
-# reachable red/green board has a distance. Store each distance in a table.
-# The table should contain distances for all 102,960 abstract board states.
+# Build one h2 lookup table per goal by recording distances to all 102,960 abstract boards.
 def map_board(state):
     mapped = []
 
@@ -174,19 +164,19 @@ def map_board(state):
         for tile in row:
             mapped_tile = map_tile(tile)
 
-            # TODO 1:
             # Append mapped_tile to new_row.
             new_row.append(mapped_tile)
 
-        # TODO 2:
         # Append the completed new_row to mapped.
         mapped.append(new_row)
 
     return tuple(tuple(row) for row in mapped)
 
 def build_h2_table(goal):
-    distances = {goal: 0}
-    queue = deque([goal])
+    abstract_goal = map_board(goal)
+
+    distances = {abstract_goal: 0}
+    queue = deque([abstract_goal])
 
     while queue:
         current_state = queue.popleft()
@@ -198,36 +188,90 @@ def build_h2_table(goal):
 
     return distances
 
-# TODO Project 2: add h2(state, goal, h2_table).
-# Map the original state in the same way as the goal and read its distance
-# from the precomputed table. Build the table before the first h2 search.
+# Return the abstract-board distance for state using the precomputed table.
 def h2(state, goal, h2_table):
     abstract_state = map_board(state)
     distance = h2_table[abstract_state]
     return distance
 
-# TODO Project 2: add h3(state, goal, h2_table).
-# Return the larger of h1(state, goal) and h2(state, goal, h2_table).
-def h3(state, goal):
-    return max(h1(state, goal), h2(state, goal))
+# Combine h1 and h2 by returning the larger admissible heuristic value.
+def h3(state, goal, h2_table):
+    return max(h1(state, goal), h2(state, goal, h2_table))
 
-# TODO Project 2: add a generic best_first_search(start, goal, heuristic).
-# Use a priority queue for OPEN and a set or dictionary for CLOSED so each
-# board state is handled as a graph-search state rather than a tree node.
-# Each queue entry should retain enough parent or path information to rebuild
-# the move string when the goal is found.
+# Search the board graph by heuristic priority while tracking visited states and solution paths.
+# Prioritize OPEN by heuristic value and preserve U, D, L, R order for deterministic ties.
+# Track removed states, maximum OPEN size, and CPU time for formatted search results.
+def best_first_search(start, goal, heuristic):
+    start_time = time.process_time()
 
-# TODO Project 2: define the priority and tie-breaking rules for OPEN.
-# Rank a state by its heuristic value and keep move generation in U, D, L, R
-# order so equal-priority results are deterministic.
+    if is_goal(start, goal):
+        return {
+            "found": True,
+            "moves": "",
+            "expanded": 0,
+            "max_queue_size": 1,
+            "time_taken": time.process_time() - start_time,
+        }
 
-# TODO Project 2: record the required search statistics.
-# Count states when they are removed from OPEN, track the largest OPEN size,
-# and measure CPU time around the search. Return the same keys used by
-# format_result.
+    counter = 0
+    start_path = ""
+    open_queue =[]
 
-# TODO Project 2: decide how the h2 table is cached when the goal changes.
-# A table is valid only for the mapped goal currently being searched.
+    start_priority = heuristic(start)
+    heapq.heappush(
+        open_queue,
+        (start_priority, counter, start, start_path)
+    )
+
+    closed = set()
+    expanded = 0
+    max_queue_size = 1
+
+    while open_queue:
+        priority, _, current, path = heapq.heappop(open_queue)
+        expanded += 1
+
+        if current in closed:
+            continue
+
+        closed.add(current)
+
+        if is_goal(current, goal):
+            return {
+                "found": True,
+                "moves": path,
+                "expanded": expanded,
+                "max_queue_size": max_queue_size,
+                "time_taken": time.process_time() - start_time,
+            }
+
+        for move, next_state in generate_moves(current):
+            if next_state in closed:
+                continue
+
+            next_path = path + move
+            counter += 1
+
+            heapq.heappush(
+                open_queue,
+                (
+                    heuristic(next_state),
+                    counter,
+                    next_state,
+                    next_path,
+                ),
+            )
+
+        max_queue_size = max(max_queue_size, len(open_queue))
+
+    return {
+        "found": False,
+        "moves": "",
+        "expanded": expanded,
+        "max_queue_size": max_queue_size,
+        "time_taken": time.process_time() - start_time,
+    }
+
 
 # Turn a search result dictionary into readable output.
 def format_result(label, result):
@@ -272,54 +316,119 @@ def run_cli():
 
     # Explain the puzzle and show the expected board format.
     print("Sliding Tile Puzzle Search")
-    print("Enter boards as nested {BOARD_SIZE}x{BOARD_SIZE} lists.")
+    print(f"Enter boards as nested {BOARD_SIZE}x{BOARD_SIZE} lists.")
     print("[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 0]]")
 
     # Read and validate both boards before choosing a search method.
     start = read_user_board("Start state: ")
     goal = read_user_board("Goal state: ")
 
-    # TODO Project 2: replace the Project 1 menu with options 1, 2, 3, and 5.
-    # Options 1, 2, and 3 run best-first search with h1, h2, and h3.
-    # Accept combinations such as 123, and keep prompting until the user
-    # enters 5 to halt. Avoid running the same option twice in one choice.
-    choice = input(
-        "Choose algorithm: (1) BFS (2) IDS (3) BFS and IDS (4) DLS: "
-    ).strip()
+    # Rebuild the h2 table whenever the mapped goal changes.
+    h2_table = None
 
-    # TODO Project 2: replace these Project 1 branches with the new loop.
-    # Prepare h2's abstraction table only when h2 or h3 is requested, then
-    # call best_first_search with the selected heuristic for each digit.
-    # Print each result with a label that identifies h1, h2, or h3.
-    # The final menu should offer 1, 2, 3, and 5, and accept combinations
-    # such as 123 before prompting again until the user chooses 5.
+    while True:
+        choice = input(
+            "Choose heuristics: (1) h1 (2) h2 (3) h3 "
+            "(5) quit: "
+        ).strip()
 
-    # TODO Project 2: validate menu input before searching.
-    # Reject letters, repeated digits, and digits outside 1, 2, 3, and 5.
+        if choice == "5":
+            break
 
-    # Run BFS and display its formatted result.
-    if choice == "1":
-        result = bfs(start, goal)
-        print(format_result("BFS", result))
-    # Run IDS and display its formatted result.
-    elif choice == "2":
-        result = ids(start, goal)
-        print(format_result("IDS", result))
-    # Run both searches so their results can be compared.
-    elif choice == "3":
-        bfs_result = bfs(start, goal)
-        print(format_result("BFS", bfs_result))
-        print()
-        ids_result = ids(start, goal)
-        print(format_result("IDS", ids_result))
-    # Read a depth limit, then run depth-limited search.
-    elif choice == "4":
-        depth = int(input("Enter DLS depth limit: "))
-        result = dls(start, goal, depth)
-        print(format_result("DLS", result))
-    # Handle choices outside the four supported options.
-    else:
-        print("Invalid choice. Please enter 1, 2, 3, or 4.")
+        valid = (
+            choice
+            and all(option in "123" for option in choice)
+            and len(set(choice)) == len(choice)
+        )
+
+        if not valid:
+            print("Invalid choice. Enter a combination of 1, 2, 3, or 5.")
+            continue
+
+        if ("2" in choice or "3" in choice) and h2_table is None:
+            print("Building h2 table...")
+            h2_table = build_h2_table(goal)
+
+        for option in choice:
+            if option == "1":
+                result = best_first_search(
+                    start,
+                    goal,
+                    lambda state: h1(state, goal),
+                )
+                print(format_result("h1", result))
+
+            elif option == "2":
+                result = best_first_search(
+                    start,
+                    goal,
+                    lambda state: h2(state, goal, h2_table),
+                )
+                print(format_result("h2", result))
+
+            elif option == "3":
+                result = best_first_search(
+                    start,
+                    goal,
+                    lambda state: h3(state, goal, h2_table),
+                )
+                print(format_result("h3", result))
+
+            print()
+
+# BOARD_SIZE = 4
+
+# goal = (
+#     (1, 2, 3, 4),
+#     (5, 6, 7, 8),
+#     (9, 10, 11, 12),
+#     (13, 14, 15, 0),
+# )
+
+# one_move = (
+#     (1, 2, 3, 4),
+#     (5, 6, 7, 8),
+#     (9, 10, 11, 12),
+#     (13, 14, 0, 15),
+# )
+# h2_table = build_h2_table(goal)
+
+# print(len(h2_table))
+# print(h2(goal, goal, h2_table))
+# print(h2(one_move, goal, h2_table))
+
+# print(h3(goal, goal, h2_table))
+# print(h3(one_move, goal, h2_table))
+
+# result = best_first_search(
+#     one_move,
+#     goal,
+#     lambda state: h2(state, goal, h2_table)
+# )
+
+# print(result)
+
+# h1_search = best_first_search(
+#     one_move,
+#     goal,
+#     lambda state: h1(state, goal)
+# )
+
+# h2_search = best_first_search(
+#     one_move,
+#     goal,
+#     lambda state: h2(state, goal, h2_table)
+# )
+
+# h3_search = best_first_search(
+#     one_move,
+#     goal,
+#     lambda state: h3(state, goal, h2_table)
+# )
+
+# print(h1_search)
+# print(h2_search)
+# print(h3_search)
 
 
 if __name__ == "__main__":
