@@ -192,6 +192,70 @@ def build_h2_table(goal):
 
     return distances
 
+# IDS Implementation - takes hours to days for 4 X 4 board
+# def collect_depth_limited(state, depth, depth_limit, path, distances):
+
+#     # Record the shortest distance when first discovered.
+#     if state not in distances:
+#         distances[state] = depth
+
+#     # Stop exploring this branch at the depth limit.
+#     if depth == depth_limit:
+#         return
+
+#     # Explore successors in the existing move order.
+#     for move, next_state in generate_moves(state):
+
+#         # Prevent cycles along the current DFS path.
+#         if next_state in path:
+#             continue
+
+#         path.add(next_state)
+
+#         collect_depth_limited(
+#             next_state,
+#             depth + 1,
+#             depth_limit,
+#             path,
+#             distances
+#         )
+
+#         # Backtrack before exploring the next branch.
+#         path.remove(next_state)
+
+# def build_h2_table_ids(goal):
+#     abstract_goal = map_board(goal)
+
+#     distances = {}
+#     depth_limit = 0
+
+#     # Number of possible abstract states for this board.
+#     from math import comb
+
+#     total_positions = BOARD_SIZE * BOARD_SIZE
+#     red_tiles = total_positions // 2 if BOARD_SIZE <= 4 else 1
+
+#     expected_states = (
+#         total_positions * comb(total_positions - 1, red_tiles)
+#     )
+
+#     # Increase the depth limit until all states are discovered.
+#     while len(distances) < expected_states:
+
+#         path = {abstract_goal}
+
+#         collect_depth_limited(
+#             abstract_goal,
+#             depth=0,
+#             depth_limit=depth_limit,
+#             path=path,
+#             distances=distances
+#         )
+
+#         depth_limit += 1
+
+#     return distances
+
 # Return the abstract-board distance for state using the precomputed table.
 def h2(state, goal, h2_table):
     abstract_state = map_board(state)
@@ -361,7 +425,7 @@ def run_cli():
             print("Building h2 table...")
             if BOARD_SIZE > 4:
                 print("For n>4, h2 groups only tile 1 as red to keep the table manageable.")
-            h2_table = build_h2_table(goal)
+            h2_table = build_h2_table_ids(goal)
 
         for option in choice:
             if option == "1":
