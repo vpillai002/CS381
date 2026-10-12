@@ -6,8 +6,8 @@ from collections import deque
 from functools import lru_cache
 from itertools import count
 
-# Project 2 specifies the 4x4 sliding-tile puzzle.
-BOARD_SIZE = 4
+# The assignment uses 4x4, but the search supports any square board size.
+BOARD_SIZE = None
 MOVE_ORDER = ("U", "D", "L", "R")
 
 
@@ -18,7 +18,7 @@ def is_goal(state, goal):
 
 # Confirm that a board has the expected shape and tile values.
 def validate_board(board):
-    # First check the outer 4x4 structure.
+    # Check that the board has the requested square dimensions.
     if not isinstance(board, (list, tuple)) or len(board) != BOARD_SIZE:
         return False
 
@@ -29,7 +29,7 @@ def validate_board(board):
             return False
         flattened.extend(row)
 
-    # A valid puzzle uses each number from 0 through 15 once.
+    # A valid puzzle uses each number from 0 through n^2 - 1 once.
     if sorted(flattened) != list(range(BOARD_SIZE * BOARD_SIZE)):
         return False
 
@@ -355,11 +355,15 @@ def read_user_board(prompt_text):
 # Run the interactive program from input prompts to search results.
 def run_cli():
     global BOARD_SIZE
-    BOARD_SIZE = 4
+    try:
+        BOARD_SIZE = int(input("Enter board size n: "))
+    except ValueError as exc:
+        raise ValueError("Board size must be a positive integer.") from exc
+    if BOARD_SIZE < 1:
+        raise ValueError("Board size must be at least 1.")
 
     print("Sliding Tile Puzzle Search")
-    print("Enter boards as nested 4x4 lists.")
-    print("[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 0]]")
+    print(f"Enter boards as nested {BOARD_SIZE}x{BOARD_SIZE} lists.")
 
     start = read_user_board("Start state: ")
     goal = read_user_board("Goal state: ")

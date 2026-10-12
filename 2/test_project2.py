@@ -77,19 +77,19 @@ class Project2Tests(unittest.TestCase):
         self.assertFalse(result["found"])
         self.assertEqual(result["expanded"], 0)
 
+    def test_three_by_three_board_works_with_all_heuristics(self):
+        project2.BOARD_SIZE = 3
+        goal = ((1, 2, 3), (4, 5, 6), (7, 8, 0))
+        start = ((1, 2, 3), (4, 5, 6), (7, 0, 8))
+
+        for heuristic in (project2.h1, project2.h2, project2.h3):
+            result = project2.best_first_search(start, goal, heuristic)
+            self.assertTrue(result["found"])
+            self.assertEqual(result["moves"], "L")
+
+        abstract_goal = project2._abstract_state(goal)
+        self.assertEqual(len(project2._build_h2_database(abstract_goal, 3)), 630)
+
 
 if __name__ == "__main__":
     unittest.main()
-
-def test_search_rejects_parity_impossible_board():
-    impossible = (
-        (1, 2, 3, 4),
-        (5, 6, 7, 8),
-        (9, 10, 11, 12),
-        (13, 15, 14, 0),
-    )
-
-    result = project2.best_first_search(impossible, GOAL, project2.h1)
-
-    assert result["found"] is False
-    assert result["expanded"] == 0

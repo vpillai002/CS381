@@ -1,68 +1,153 @@
-# CS 381 Project 2
+# CS 381 Project 2: Sliding-Tile Search
 
-## Design
+## 1. Design Documentation
 
-The program solves the fixed 4x4 sliding-tile puzzle with graph-based A* search.
-Boards are immutable tuples of row tuples so they can be used as dictionary and
-set keys. Each OPEN entry is held in a heap ordered by `g + h`; Manhattan
-distance is a secondary tie-breaker, so it does not change A*'s optimality.
-The search records the best known path cost and predecessor for each board,
-skips stale heap entries, and reopens a state if a less expensive path is found.
-The reported expanded count is the number of non-stale boards removed from
-OPEN. The maximum queue size counts distinct boards currently in OPEN.
+### 1.1 Overall structure
 
-`h1` sums the Manhattan distance of every numbered tile to its goal position.
-For `h2`, numbered tiles 1 through 8 are mapped to red and 9 through 15 to
-green. A breadth-first traversal from the abstract goal fills a cached table
-with exact distances for all 102,960 abstract boards. This is equivalent to
-the repeated depth-limited search requested in the handout, but visits each
-abstract state once. `h3` is `max(h1, h2)`. The `h2` table is built on first use
-and reused for later searches in the same process.
+The program solves the sliding-tile puzzle using graph-based A* search. It is
+organized into four parts:
 
-Before searching, a parity test rejects states that cannot reach the supplied
-goal. A* uses the goal-relative inversion ordering, so this works for any
-valid goal arrangement, not only the standard goal.
+1. Board input and validation (`parse_board`, `validate_board`).
+2. Board operations and move generation (`is_goal`, `find_blank`, `generate_moves`).
+3. Heuristics and graph search (`h1`, `h2`, `h3`, `best_first_search`).
+4. Result formatting and command-line interaction (`format_result`, `run_cli`).
 
-## Function Reference
+The board dimension is requested at runtime. The assignment's required case is
+4x4; other square sizes are supported, though large `h2` databases can require
+substantial time and memory.
 
-All board arguments below are valid 4x4 boards containing each integer from 0
-through 15 exactly once. Search heuristics must be admissible and accept
-`(state, goal)`.
+### 1.2 Data structures
 
-| Function | Inputs | Output | Preconditions |
-| --- | --- | --- | --- |
-| `is_goal(state, goal)` | Two boards | Boolean equality result | Both arguments are board-shaped sequences |
-| `validate_board(board)` | Candidate board | Boolean validity result | `BOARD_SIZE` is 4 |
-| `parse_board(raw_text)` | Text containing a nested board, or four whitespace-separated rows | Immutable board tuple; raises `ValueError` for invalid input | `BOARD_SIZE` is 4 |
-| `find_blank(state)` | Board | `(row, column)` of tile 0 | Board contains exactly one blank |
-| `generate_moves(state, parent=None)` | Board and optional parent board | List of `(move, next_board)` pairs; move names the tile's slide direction | `BOARD_SIZE` is 4; state is valid |
-| `h1(state, goal)` | Current board and goal | Manhattan-distance integer | Both boards have the same tile set |
-| `_abstract_state(state)` | Board | Flat tuple of 0 (blank), 1 (red), and 2 (green) | `BOARD_SIZE` is 4 |
-| `_abstract_neighbors(state, size)` | Abstract flat tuple and board width | Iterator of legal abstract neighbors | Abstract state has one blank and `size * size` entries |
-| `_build_h2_database(abstract_goal, size)` | Abstract goal and board width | Dictionary mapping every reachable abstract state to its exact distance | Abstract goal is valid; result is cached by goal and size |
-| `h2(state, goal)` | Current board and goal | Abstract-distance integer | Both boards are valid 4x4 boards |
-| `h3(state, goal)` | Current board and goal | Maximum of `h1` and `h2` | Both boards are valid 4x4 boards |
-| `is_solvable(start, goal)` | Two boards | Boolean parity compatibility result | Boards have the same square dimensions and tile set |
-| `_failed_result(start_time, max_queue_size=0, expanded=0)` | CPU start timestamp and optional metrics | Standard not-found result dictionary | Timestamp uses `time.process_time()` |
-| `best_first_search(start, goal, heuristic)` | Start board, goal board, heuristic callable | Result dictionary: `found`, `moves`, `expanded`, `max_queue_size`, `time_taken` | Valid equal-size boards; heuristic is admissible |
-| `format_result(label, result)` | Display label and search result | Formatted output string | Result has the keys returned by `best_first_search` |
-| `read_user_board(prompt_text)` | Prompt string | Parsed immutable board | Interactive standard input contains a valid board |
-| `run_cli()` | None; reads standard input | Runs selected searches and prints results | Interactive input supplies valid start and goal boards |
+- **Board:** A tuple of row tuples. Immutable states can be dictionary keys.
+- **OPEN:** A `heapq` priority queue ordered first by `g + h`, then by Manhattan
+  distance as a tie-breaker. The tie-breaker does not change the A* priority.
+- **CLOSED and best path costs:** Dictionaries record expanded costs and the
+  least known cost for each state. Stale queue entries are skipped, and a state
+  is reopened if a lower-cost route is found.
+- **Predecessors:** A dictionary stores each state's previous state and move;
+  the move sequence is reconstructed when the goal is removed from OPEN.
+- **Counters:** Integers record expanded states and the largest number of
+  distinct states in OPEN. CPU time is measured with `time.process_time()`.
 
-## Run
+### 1.3 Heuristics
 
-This is Python source and does not need a separate compilation step. From the
+- **`h1`:** Sum of the Manhattan distances from each numbered tile to its
+  position in the goal. The blank is excluded.
+- **`h2`:** Maps tiles 1 through 8 to red and 9 through 15 to green for the
+  required 4x4 board. A breadth-first traversal from the abstract goal caches
+  exact distances for all 102,960 abstract states. This computes the same
+  distance table as the IDS procedure described in the assignment, but uses
+  BFS to visit each abstract state once.
+- **`h3`:** `max(h1, h2)`.
+
+The abstract table is generated on the first request for `h2` and reused for
+later searches in the process. The implementation generalizes the color split
+for other dimensions, but the 4x4 tile grouping above is the assignment's
+definition.
+
+Before search, a parity check rejects start/goal pairs that cannot reach each
+other. The parity calculation is relative to the supplied goal arrangement.
+
+### 1.4 A* pseudocode
+
+```text
+BEST_FIRST_SEARCH(start, goal, heuristic):
+    if start and goal have incompatible parity:
+        return failure
+
+    put start in OPEN with cost 0 and priority heuristic(start, goal)
+    while OPEN is not empty:
+        remove the lowest-priority current entry
+        skip it if it is stale
+        count the state as expanded
+
+        if state is the goal:
+            reconstruct moves from predecessor records
+            return solution and search statistics
+
+        for each legal successor:
+            if this path improves the best known cost:
+                update its predecessor and cost
+                insert or reopen it in OPEN
+
+    return failure and search statistics
+```
+
+### 1.5 Libraries
+
+The solver uses only Python standard-library modules:
+
+- `ast` safely parses nested-list input.
+- `heapq` and `itertools.count` implement deterministic priority ordering.
+- `collections.deque` builds the abstract `h2` distance table.
+- `functools.lru_cache` reuses abstract tables.
+- `time` measures CPU time; `sys` reports invalid input through the exit code.
+
+## 2. Code Documentation
+
+Unless stated otherwise, board inputs are valid `n x n` permutations of the
+integers from 0 through `n^2 - 1`. Search heuristic functions accept
+`(state, goal)` and return an admissible nonnegative integer.
+
+| Function | Inputs and output | Preconditions |
+| --- | --- | --- |
+| `is_goal(state, goal)` | Two boards; returns a boolean | Both arguments are board-shaped sequences |
+| `validate_board(board)` | Candidate board; returns a boolean | `BOARD_SIZE` is a positive integer |
+| `parse_board(raw_text)` | Board text; returns an immutable board or raises `ValueError` | `BOARD_SIZE` has been set |
+| `find_blank(state)` | Board; returns the blank's `(row, column)` | The board contains one blank |
+| `generate_moves(state, parent=None)` | Board and optional parent; returns `(move, next_state)` pairs | State matches `BOARD_SIZE` and is valid |
+| `h1(state, goal)` | Current and goal boards; returns Manhattan distance | Boards have the same tile set |
+| `_abstract_state(state)` | Board; returns a flat red/green/blank tuple | Board matches `BOARD_SIZE` |
+| `_abstract_neighbors(state, size)` | Abstract state and dimension; yields legal abstract neighbors | State has `size * size` entries and one blank |
+| `_build_h2_database(abstract_goal, size)` | Abstract goal and dimension; returns abstract-state distances | Abstract goal is valid; table may be large |
+| `h2(state, goal)` | Current and goal boards; returns abstract distance | Boards are valid and have equal dimensions |
+| `h3(state, goal)` | Current and goal boards; returns `max(h1, h2)` | Boards are valid and have equal dimensions |
+| `is_solvable(start, goal)` | Two boards; returns parity compatibility | Boards have equal square dimensions and tile sets |
+| `best_first_search(start, goal, heuristic)` | Start, goal, and heuristic; returns result dictionary | Valid equal-size boards and admissible heuristic |
+| `format_result(label, result)` | Label and result dictionary; returns formatted text | Result comes from the search function |
+| `read_user_board(prompt_text)` | Prompt; returns parsed board | Standard input contains a valid board |
+| `run_cli()` | Reads input and prints results; returns `None` | User supplies valid dimension and boards |
+
+The search result dictionary contains `found`, `moves`, `expanded`,
+`max_queue_size`, and `time_taken`. A not-found result has an empty move string.
+
+## 3. Compiling and Running
+
+Python is interpreted; no separate compilation step is needed. From the
 repository root, run:
 
-```sh
+```bash
 python3 2/project2.py
 ```
 
-Enter the start board, goal board, then any combination such as `123`. Enter
-`4` (or `5`) to halt. The `h2` abstract-distance table is generated the first
-time option 2 or 3 is selected.
+Enter the board dimension, start board, and goal board. At the menu, enter any
+combination of `1`, `2`, and `3`, such as `123`. Enter `4` or `5` to halt.
+For the assignment, use dimension `4`.
 
-## Deep-Board Example
+Example one-move input:
+
+```text
+4
+[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 0, 15]]
+[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 0]]
+123
+4
+```
+
+## 4. Test Effort
+
+The automated tests cover Manhattan distance, the complete 4x4 abstract table,
+optimal path length for all three heuristics, move labels, parity rejection,
+and a 3x3 board. Run them from this directory with:
+
+```bash
+pytest -q
+```
+
+The current test run reports six passing tests. A verified deep-board `h3`
+case is included below; its optimal solution has 34 moves. `h2` can require
+many more expansions on some deep boards, so a complete deep-board `123` run
+has not been verified.
 
 Goal:
 
@@ -76,23 +161,17 @@ Start:
 [[5, 7, 8, 1], [6, 9, 3, 4], [11, 13, 15, 14], [2, 0, 10, 12]]
 ```
 
-For this start, `h1 = 28`, `h2 = 12`, and `h3 = 28`. A* with `h3` found an
-optimal 34-move solution; the verified run was:
+Verified `h3` result:
 
 ```text
-Sequence: DRULLDDDLURULURDRDDLURRULDRDLUUULL
+Sequence of moves: DRULLDDDLURULURDRDDLURRULDRDLUUULL
+Number of moves: 34
 States removed: 1061
 Maximum OPEN size: 979
 ```
 
-The `h1` and `h3` runs on this start each removed 1,061 states and reached a
-maximum OPEN size of 979. A separate deep-board candidate with `h2 = 34` and
-`h1 = 44` exceeded the 30-second check window under `h2`-only search. Use
-shorter inputs when benchmarking `h2`, and allow ample runtime for harder
-instances. Exact CPU timings vary by machine.
-
-## Remaining Team Submission Items
+## 5. Remaining Team Submission Items
 
 The team should add the actual role split for both partners and the required
-AI-use summary/transcript. Those details cannot be inferred from the source
-tree or assignment PDF and should be written by the team accurately.
+AI-use summary and full transcript. Those details cannot be inferred from the
+code or assignment document.
