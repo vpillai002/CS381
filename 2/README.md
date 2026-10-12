@@ -169,9 +169,3 @@ Number of moves: 34
 States removed: 1061
 Maximum OPEN size: 979
 ```
-
-## 5. Remaining Team Submission Items
-
-The team should add the actual role split for both partners and the required
-AI-use summary and full transcript. Those details cannot be inferred from the
-code or assignment document.
