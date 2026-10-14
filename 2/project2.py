@@ -1,10 +1,12 @@
 import ast
+import heapq
 import sys
 import time
 from collections import deque
-import heapq
+from functools import lru_cache
+from itertools import count
 
-# make n, and prompt user for board size value
+# The assignment uses 4x4, but the search supports any square board size.
 BOARD_SIZE = None
 MOVE_ORDER = ("U", "D", "L", "R")
 
@@ -16,7 +18,7 @@ def is_goal(state, goal):
 
 # Confirm that a board has the expected shape and tile values.
 def validate_board(board):
-    # First check the outer 4x4 structure.
+    # Check that the board has the requested square dimensions.
     if not isinstance(board, (list, tuple)) or len(board) != BOARD_SIZE:
         return False
 
@@ -27,7 +29,7 @@ def validate_board(board):
             return False
         flattened.extend(row)
 
-    # A valid puzzle uses each number from 0 through 15 once.
+    # A valid puzzle uses each number from 0 through n^2 - 1 once.
     if sorted(flattened) != list(range(BOARD_SIZE * BOARD_SIZE)):
         return False
 
@@ -115,155 +117,122 @@ def generate_moves(state, parent=None):
 
     return moves
 
-# Calculate h1 as the sum of Manhattan distances for all nonblank tiles.
 def h1(state, goal):
-    total = 0
+    """Return the Manhattan-distance sum for numbered tiles.
 
-    for r in range(len(state)):
-        for c in range(len(state[r])):
-
-            tile = state[r][c]
-
-            if tile == 0:
-                continue
-
-            for goal_r in range(len(goal)):
-                for goal_c in range(len(goal[goal_r])):
-
-                    if tile == goal[goal_r][goal_c]:
-
-                        # Calculate Manhattan distance
-                        # between (r, c) and (goal_r, goal_c).
-                        distance = abs(r - goal_r) + abs(c - goal_c)
-
-                        # Add distance to total.
-                        total += distance
-
-    return total
-
-
-
-
-
-# Map numbered tiles to Red/Green categories while preserving a hashable board.
-def map_tile(tile):
-    if tile == 0:
-        return 0
-    elif 1 <= tile <= 8:
-        return 1 # red
-    else:
-        return 2 # green
-
-# Build one h2 lookup table per goal by recording distances to all 102,960 abstract boards.
-def map_board(state):
-    mapped = []
-
-    for row in state:
-        new_row = []
-
-        for tile in row:
-            mapped_tile = map_tile(tile)
-
-            # Append mapped_tile to new_row.
-            new_row.append(mapped_tile)
-
-        # Append the completed new_row to mapped.
-        mapped.append(new_row)
-
-    return tuple(tuple(row) for row in mapped)
-
-def build_h2_table(goal):
-    abstract_goal = map_board(goal)
-
-    distances = {abstract_goal: 0}
-    queue = deque([abstract_goal])
-
-    while queue:
-        current_state = queue.popleft()
-
-        for move, next_state in generate_moves(current_state):
-            if next_state not in distances:
-                distances[next_state] = distances[current_state] + 1
-                queue.append(next_state)
-
-    return distances
-
-# Return the abstract-board distance for state using the precomputed table.
-def h2(state, goal, h2_table):
-    abstract_state = map_board(state)
-    distance = h2_table[abstract_state]
+    Inputs: start/search state and goal state as square sequences.
+    Output: nonnegative integer distance, excluding the blank tile.
+    Preconditions: both states have the same valid square shape and tile set.
+    """
+    goal_positions = {
+        tile: (row_index, column_index)
+        for row_index, row in enumerate(goal)
+        for column_index, tile in enumerate(row)
+    }
+    distance = 0
+    for row_index, row in enumerate(state):
+        for column_index, tile in enumerate(row):
+            if tile != 0:
+                goal_row, goal_column = goal_positions[tile]
+                distance += abs(row_index - goal_row) + abs(column_index - goal_column)
     return distance
 
-# Combine h1 and h2 by returning the larger admissible heuristic value.
-def h3(state, goal, h2_table):
-    return max(h1(state, goal), h2(state, goal, h2_table))
 
-# Search the board graph by heuristic priority while tracking visited states and solution paths.
-# Prioritize OPEN by heuristic value and preserve U, D, L, R order for deterministic ties.
-# Track removed states, maximum OPEN size, and CPU time for formatted search results.
-def best_first_search(start, goal, heuristic):
-    start_time = time.process_time()
-
-    if is_goal(start, goal):
-        return {
-            "found": True,
-            "moves": "",
-            "expanded": 0,
-            "max_queue_size": 1,
-            "time_taken": time.process_time() - start_time,
-        }
-
-    counter = 0
-    start_path = ""
-    open_queue =[]
-
-    start_priority = heuristic(start)
-    heapq.heappush(
-        open_queue,
-        (start_priority, counter, start, start_path)
+def _abstract_state(state):
+    """Map tiles to blank, red, or green categories for heuristic 2."""
+    red_tile_limit = BOARD_SIZE * BOARD_SIZE // 2
+    return tuple(
+        0 if tile == 0 else 1 if tile <= red_tile_limit else 2
+        for row in state
+        for tile in row
     )
 
-    closed = set()
-    expanded = 0
-    max_queue_size = 1
 
-    while open_queue:
-        priority, _, current, path = heapq.heappop(open_queue)
-        expanded += 1
+def _abstract_neighbors(state, size):
+    """Yield abstract boards reachable by one legal blank swap."""
+    blank_index = state.index(0)
+    row_index, column_index = divmod(blank_index, size)
+    neighbor_indices = []
+    if row_index + 1 < size:
+        neighbor_indices.append(blank_index + size)
+    if row_index > 0:
+        neighbor_indices.append(blank_index - size)
+    if column_index + 1 < size:
+        neighbor_indices.append(blank_index + 1)
+    if column_index > 0:
+        neighbor_indices.append(blank_index - 1)
 
-        if current in closed:
-            continue
+    for neighbor_index in neighbor_indices:
+        next_state = list(state)
+        next_state[blank_index], next_state[neighbor_index] = (
+            next_state[neighbor_index],
+            next_state[blank_index],
+        )
+        yield tuple(next_state)
 
-        closed.add(current)
 
-        if is_goal(current, goal):
-            return {
-                "found": True,
-                "moves": path,
-                "expanded": expanded,
-                "max_queue_size": max_queue_size,
-                "time_taken": time.process_time() - start_time,
-            }
+@lru_cache(maxsize=4)
+def _build_h2_database(abstract_goal, size):
+    """Build exact abstract distances from the goal using breadth-first search."""
+    distances = {abstract_goal: 0}
+    frontier = deque([abstract_goal])
+    while frontier:
+        state = frontier.popleft()
+        next_distance = distances[state] + 1
+        for neighbor in _abstract_neighbors(state, size):
+            if neighbor not in distances:
+                distances[neighbor] = next_distance
+                frontier.append(neighbor)
+    return distances
 
-        for move, next_state in generate_moves(current):
-            if next_state in closed:
-                continue
 
-            next_path = path + move
-            counter += 1
+def h2(state, goal):
+    """Return the exact distance in the red/green abstract puzzle.
 
-            heapq.heappush(
-                open_queue,
-                (
-                    heuristic(next_state),
-                    counter,
-                    next_state,
-                    next_path,
-                ),
-            )
+    Inputs: start/search state and goal state as square sequences.
+    Output: nonnegative integer abstract distance.
+    Preconditions: both states are valid boards of the same size.
+    """
+    abstract_goal = _abstract_state(goal)
+    distances = _build_h2_database(abstract_goal, len(goal))
+    return distances[_abstract_state(state)]
 
-        max_queue_size = max(max_queue_size, len(open_queue))
 
+def h3(state, goal):
+    """Return the maximum of Manhattan distance and abstract distance."""
+    return max(h1(state, goal), h2(state, goal))
+
+
+def is_solvable(start, goal):
+    """Return whether start and goal share the sliding puzzle's parity class."""
+    size = len(start)
+    goal_order = {
+        tile: rank
+        for rank, tile in enumerate(tile for row in goal for tile in row if tile != 0)
+    }
+
+    def inversion_parity(state):
+        ordered_tiles = [goal_order[tile] for row in state for tile in row if tile != 0]
+        inversions = sum(
+            ordered_tiles[left] > ordered_tiles[right]
+            for left in range(len(ordered_tiles))
+            for right in range(left + 1, len(ordered_tiles))
+        )
+        return inversions % 2
+
+    if size % 2:
+        return inversion_parity(start) == inversion_parity(goal)
+
+    def blank_row_from_bottom(state):
+        blank_row = next(row_index for row_index, row in enumerate(state) if 0 in row)
+        return size - blank_row
+
+    start_parity = (inversion_parity(start) + blank_row_from_bottom(start)) % 2
+    goal_parity = (inversion_parity(goal) + blank_row_from_bottom(goal)) % 2
+    return start_parity == goal_parity
+
+
+def _failed_result(start_time, max_queue_size=0, expanded=0):
     return {
         "found": False,
         "moves": "",
@@ -272,6 +241,82 @@ def best_first_search(start, goal, heuristic):
         "time_taken": time.process_time() - start_time,
     }
 
+
+def best_first_search(start, goal, heuristic):
+    """Run graph-based A* and return the optimal move sequence and metrics.
+
+    Inputs: start board, goal board, and a heuristic callable(state, goal).
+    Output: result dictionary with found, moves, expanded, max_queue_size,
+    and time_taken keys. Each move names the direction its tile slides.
+    Preconditions: start and goal are valid boards of equal square size;
+    heuristic is admissible for unit-cost moves.
+    """
+    start = tuple(tuple(row) for row in start)
+    goal = tuple(tuple(row) for row in goal)
+    start_time = time.process_time()
+
+    if not is_solvable(start, goal):
+        return _failed_result(start_time)
+
+    insertion_order = count()
+    start_h = heuristic(start, goal)
+    start_tie_breaker = h1(start, goal)
+    frontier = [(start_h, start_tie_breaker, next(insertion_order), 0, start)]
+    open_costs = {start: 0}
+    closed_costs = {}
+    parent = {}
+    best_cost = {start: 0}
+    max_queue_size = 1
+    expanded = 0
+
+    while frontier:
+        _, _, _, path_cost, state = heapq.heappop(frontier)
+        if open_costs.get(state) != path_cost:
+            continue
+
+        del open_costs[state]
+        closed_costs[state] = path_cost
+        expanded += 1
+
+        if is_goal(state, goal):
+            moves = []
+            while state != start:
+                state, move = parent[state]
+                moves.append(move)
+            return {
+                "found": True,
+                "moves": "".join(reversed(moves)),
+                "expanded": expanded,
+                "max_queue_size": max_queue_size,
+                "time_taken": time.process_time() - start_time,
+            }
+
+        for move, neighbor in generate_moves(state):
+            new_cost = path_cost + 1
+            if new_cost >= best_cost.get(neighbor, float("inf")):
+                continue
+
+            best_cost[neighbor] = new_cost
+            parent[neighbor] = (state, move)
+            if neighbor in closed_costs:
+                del closed_costs[neighbor]
+
+            neighbor_h = heuristic(neighbor, goal)
+            tie_breaker = h1(neighbor, goal)
+            open_costs[neighbor] = new_cost
+            heapq.heappush(
+                frontier,
+                (
+                    new_cost + neighbor_h,
+                    tie_breaker,
+                    next(insertion_order),
+                    new_cost,
+                    neighbor,
+                ),
+            )
+            max_queue_size = max(max_queue_size, len(open_costs))
+
+    return _failed_result(start_time, max_queue_size, expanded)
 
 # Turn a search result dictionary into readable output.
 def format_result(label, result):
@@ -310,125 +355,34 @@ def read_user_board(prompt_text):
 # Run the interactive program from input prompts to search results.
 def run_cli():
     global BOARD_SIZE
-    BOARD_SIZE = int(input("Enter board size n: "))
+    try:
+        BOARD_SIZE = int(input("Enter board size n: "))
+    except ValueError as exc:
+        raise ValueError("Board size must be a positive integer.") from exc
     if BOARD_SIZE < 1:
         raise ValueError("Board size must be at least 1.")
 
-    # Explain the puzzle and show the expected board format.
     print("Sliding Tile Puzzle Search")
     print(f"Enter boards as nested {BOARD_SIZE}x{BOARD_SIZE} lists.")
-    print("[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 0]]")
 
-    # Read and validate both boards before choosing a search method.
     start = read_user_board("Start state: ")
     goal = read_user_board("Goal state: ")
 
-    # Rebuild the h2 table whenever the mapped goal changes.
-    h2_table = None
-
+    heuristics = {"1": h1, "2": h2, "3": h3}
     while True:
         choice = input(
-            "Choose heuristics: (1) h1 (2) h2 (3) h3 "
-            "(5) quit: "
+            "Choose heuristic(s): 1=h1, 2=h2, 3=h3; enter 4 or 5 to halt: "
         ).strip()
-
-        if choice == "5":
+        if choice in {"4", "5"}:
             break
-
-        valid = (
-            choice
-            and all(option in "123" for option in choice)
-            and len(set(choice)) == len(choice)
-        )
-
-        if not valid:
-            print("Invalid choice. Enter a combination of 1, 2, 3, or 5.")
+        if not choice or any(option not in heuristics for option in choice):
+            print("Invalid choice. Enter any combination of 1, 2, and 3, or 4 to halt.")
             continue
 
-        if ("2" in choice or "3" in choice) and h2_table is None:
-            print("Building h2 table...")
-            h2_table = build_h2_table(goal)
-
         for option in choice:
-            if option == "1":
-                result = best_first_search(
-                    start,
-                    goal,
-                    lambda state: h1(state, goal),
-                )
-                print(format_result("h1", result))
-
-            elif option == "2":
-                result = best_first_search(
-                    start,
-                    goal,
-                    lambda state: h2(state, goal, h2_table),
-                )
-                print(format_result("h2", result))
-
-            elif option == "3":
-                result = best_first_search(
-                    start,
-                    goal,
-                    lambda state: h3(state, goal, h2_table),
-                )
-                print(format_result("h3", result))
-
-            print()
-
-# BOARD_SIZE = 4
-
-# goal = (
-#     (1, 2, 3, 4),
-#     (5, 6, 7, 8),
-#     (9, 10, 11, 12),
-#     (13, 14, 15, 0),
-# )
-
-# one_move = (
-#     (1, 2, 3, 4),
-#     (5, 6, 7, 8),
-#     (9, 10, 11, 12),
-#     (13, 14, 0, 15),
-# )
-# h2_table = build_h2_table(goal)
-
-# print(len(h2_table))
-# print(h2(goal, goal, h2_table))
-# print(h2(one_move, goal, h2_table))
-
-# print(h3(goal, goal, h2_table))
-# print(h3(one_move, goal, h2_table))
-
-# result = best_first_search(
-#     one_move,
-#     goal,
-#     lambda state: h2(state, goal, h2_table)
-# )
-
-# print(result)
-
-# h1_search = best_first_search(
-#     one_move,
-#     goal,
-#     lambda state: h1(state, goal)
-# )
-
-# h2_search = best_first_search(
-#     one_move,
-#     goal,
-#     lambda state: h2(state, goal, h2_table)
-# )
-
-# h3_search = best_first_search(
-#     one_move,
-#     goal,
-#     lambda state: h3(state, goal, h2_table)
-# )
-
-# print(h1_search)
-# print(h2_search)
-# print(h3_search)
+            label = f"Best-first search (h{option})"
+            result = best_first_search(start, goal, heuristics[option])
+            print(format_result(label, result))
 
 
 if __name__ == "__main__":
@@ -439,13 +393,3 @@ if __name__ == "__main__":
     except ValueError as exc:
         print(f"Input error: {exc}")
         sys.exit(1)
-
-
-# TODO Project 2 submission checklist:
-# Document each function's inputs, outputs, and preconditions.
-# Explain the board representation, priority queue, CLOSED structure, and h2 table.
-# Add compilation and execution instructions to the design documentation.
-# Include a start/goal pair whose solution requires at least 30 moves.
-# Run that pair with options 123 and record the required output.
-# Describe which code was produced with AI and include the complete transcript.
-# Record each teammate's role.
