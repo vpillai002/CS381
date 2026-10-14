@@ -193,68 +193,82 @@ def build_h2_table(goal):
     return distances
 
 # IDS Implementation - takes hours to days for 4 X 4 board
-# def collect_depth_limited(state, depth, depth_limit, path, distances):
+def collect_depth_limited(state, depth, depth_limit, path, distances,
+                          seen_depths):
 
-#     # Record the shortest distance when first discovered.
-#     if state not in distances:
-#         distances[state] = depth
+    # Transposition pruning: if this state was already reached at an equal
+    # or shallower depth during this iteration, its remaining search space
+    # has already been explored with at least as much depth available.
+    previous_depth = seen_depths.get(state)
+    if previous_depth is not None and previous_depth <= depth:
+        return
+    seen_depths[state] = depth
 
-#     # Stop exploring this branch at the depth limit.
-#     if depth == depth_limit:
-#         return
+    # Record the shortest distance when first discovered.
+    if state not in distances:
+        distances[state] = depth
 
-#     # Explore successors in the existing move order.
-#     for move, next_state in generate_moves(state):
+    # Stop exploring this branch at the depth limit.
+    if depth == depth_limit:
+        return
 
-#         # Prevent cycles along the current DFS path.
-#         if next_state in path:
-#             continue
+    # Explore successors in the existing move order.
+    for move, next_state in generate_moves(state):
 
-#         path.add(next_state)
+        # Prevent cycles along the current DFS path.
+        if next_state in path:
+            continue
 
-#         collect_depth_limited(
-#             next_state,
-#             depth + 1,
-#             depth_limit,
-#             path,
-#             distances
-#         )
+        path.add(next_state)
 
-#         # Backtrack before exploring the next branch.
-#         path.remove(next_state)
+        collect_depth_limited(
+            next_state,
+            depth + 1,
+            depth_limit,
+            path,
+            distances,
+            seen_depths
+        )
 
-# def build_h2_table_ids(goal):
-#     abstract_goal = map_board(goal)
+        # Backtrack before exploring the next branch.
+        path.remove(next_state)
 
-#     distances = {}
-#     depth_limit = 0
+def build_h2_table_ids(goal):
+    abstract_goal = map_board(goal)
 
-#     # Number of possible abstract states for this board.
-#     from math import comb
+    distances = {}
+    depth_limit = 0
 
-#     total_positions = BOARD_SIZE * BOARD_SIZE
-#     red_tiles = total_positions // 2 if BOARD_SIZE <= 4 else 1
+    # Number of possible abstract states for this board.
+    from math import comb
 
-#     expected_states = (
-#         total_positions * comb(total_positions - 1, red_tiles)
-#     )
+    total_positions = BOARD_SIZE * BOARD_SIZE
+    red_tiles = total_positions // 2 if BOARD_SIZE <= 4 else 1
 
-#     # Increase the depth limit until all states are discovered.
-#     while len(distances) < expected_states:
+    expected_states = (
+        total_positions * comb(total_positions - 1, red_tiles)
+    )
 
-#         path = {abstract_goal}
+    # Increase the depth limit until all states are discovered.
+    while len(distances) < expected_states:
 
-#         collect_depth_limited(
-#             abstract_goal,
-#             depth=0,
-#             depth_limit=depth_limit,
-#             path=path,
-#             distances=distances
-#         )
+        path = {abstract_goal}
+        # Reset this per depth limit.  Reusing it across iterations could
+        # incorrectly prune paths that have more depth available now.
+        seen_depths = {}
 
-#         depth_limit += 1
+        collect_depth_limited(
+            abstract_goal,
+            depth=0,
+            depth_limit=depth_limit,
+            path=path,
+            distances=distances,
+            seen_depths=seen_depths
+        )
 
-#     return distances
+        depth_limit += 1
+
+    return distances
 
 # Return the abstract-board distance for state using the precomputed table.
 def h2(state, goal, h2_table):
@@ -269,65 +283,65 @@ def h3(state, goal, h2_table):
 # Search the board graph by heuristic priority while tracking visited states and solution paths.
 # Prioritize OPEN by heuristic value and preserve U, D, L, R order for deterministic ties.
 # Track removed states, maximum OPEN size, and CPU time for formatted search results.
-def best_first_search(start, goal, heuristic):
-    """Graph-based A*: OPEN prioritized by g+h; reopen improved CLOSED states."""
-    start_time = time.process_time()
-    start = tuple(tuple(row) for row in start)
-    goal = tuple(tuple(row) for row in goal)
+# def best_first_search(start, goal, heuristic):
+#     """Graph-based A*: OPEN prioritized by g+h; reopen improved CLOSED states."""
+#     start_time = time.process_time()
+#     start = tuple(tuple(row) for row in start)
+#     goal = tuple(tuple(row) for row in goal)
 
-    if not is_solvable(start, goal):
-        return {"found": False, "moves": "", "expanded": 0,
-                "max_queue_size": 0, "time_taken": time.process_time() - start_time}
+#     if not is_solvable(start, goal):
+#         return {"found": False, "moves": "", "expanded": 0,
+#                 "max_queue_size": 0, "time_taken": time.process_time() - start_time}
 
-    if is_goal(start, goal):
-        return {"found": True, "moves": "", "expanded": 0,
-                "max_queue_size": 1, "time_taken": time.process_time() - start_time}
+#     if is_goal(start, goal):
+#         return {"found": True, "moves": "", "expanded": 0,
+#                 "max_queue_size": 1, "time_taken": time.process_time() - start_time}
 
-    counter = count()
-    open_queue = []
-    open_costs = {start: 0}
-    best_costs = {start: 0}
-    closed = set()
-    parents = {}
-    heapq.heappush(open_queue, (heuristic(start), next(counter), 0, start))
-    expanded = 0
-    max_queue_size = 1
+#     counter = count()
+#     open_queue = []
+#     open_costs = {start: 0}
+#     best_costs = {start: 0}
+#     closed = set()
+#     parents = {}
+#     heapq.heappush(open_queue, (heuristic(start), next(counter), 0, start))
+#     expanded = 0
+#     max_queue_size = 1
 
-    while open_queue:
-        priority, _, cost, current = heapq.heappop(open_queue)
-        # Ignore outdated heap entries for states improved in the meantime.
-        if open_costs.get(current) != cost:
-            continue
-        del open_costs[current]
-        closed.add(current)
-        expanded += 1
+#     while open_queue:
+#         priority, _, cost, current = heapq.heappop(open_queue)
+#         # Ignore outdated heap entries for states improved in the meantime.
+#         if open_costs.get(current) != cost:
+#             continue
+#         del open_costs[current]
+#         closed.add(current)
+#         expanded += 1
 
-        if is_goal(current, goal):
-            path = []
-            while current != start:
-                current, move = parents[current]
-                path.append(move)
-            return {"found": True, "moves": "".join(reversed(path)),
-                    "expanded": expanded, "max_queue_size": max_queue_size,
-                    "time_taken": time.process_time() - start_time}
+#         if is_goal(current, goal):
+#             path = []
+#             while current != start:
+#                 current, move = parents[current]
+#                 path.append(move)
+#             return {"found": True, "moves": "".join(reversed(path)),
+#                     "expanded": expanded, "max_queue_size": max_queue_size,
+#                     "time_taken": time.process_time() - start_time}
 
-        for move, next_state in generate_moves(current):
-            new_cost = cost + 1
-            if new_cost >= best_costs.get(next_state, float("inf")):
-                continue
-            best_costs[next_state] = new_cost
-            parents[next_state] = (current, move)
-            if next_state in closed:
-                closed.remove(next_state)
-            open_costs[next_state] = new_cost
-            heapq.heappush(open_queue, (
-                new_cost + heuristic(next_state), next(counter), new_cost, next_state
-            ))
-            max_queue_size = max(max_queue_size, len(open_costs))
+#         for move, next_state in generate_moves(current):
+#             new_cost = cost + 1
+#             if new_cost >= best_costs.get(next_state, float("inf")):
+#                 continue
+#             best_costs[next_state] = new_cost
+#             parents[next_state] = (current, move)
+#             if next_state in closed:
+#                 closed.remove(next_state)
+#             open_costs[next_state] = new_cost
+#             heapq.heappush(open_queue, (
+#                 new_cost + heuristic(next_state), next(counter), new_cost, next_state
+#             ))
+#             max_queue_size = max(max_queue_size, len(open_costs))
 
-    return {"found": False, "moves": "", "expanded": expanded,
-            "max_queue_size": max_queue_size,
-            "time_taken": time.process_time() - start_time}
+#     return {"found": False, "moves": "", "expanded": expanded,
+#             "max_queue_size": max_queue_size,
+#             "time_taken": time.process_time() - start_time}
 
 
 def is_solvable(start, goal):
