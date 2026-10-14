@@ -283,65 +283,65 @@ def h3(state, goal, h2_table):
 # Search the board graph by heuristic priority while tracking visited states and solution paths.
 # Prioritize OPEN by heuristic value and preserve U, D, L, R order for deterministic ties.
 # Track removed states, maximum OPEN size, and CPU time for formatted search results.
-# def best_first_search(start, goal, heuristic):
-#     """Graph-based A*: OPEN prioritized by g+h; reopen improved CLOSED states."""
-#     start_time = time.process_time()
-#     start = tuple(tuple(row) for row in start)
-#     goal = tuple(tuple(row) for row in goal)
+def best_first_search(start, goal, heuristic):
+    """Graph-based A*: OPEN prioritized by g+h; reopen improved CLOSED states."""
+    start_time = time.process_time()
+    start = tuple(tuple(row) for row in start)
+    goal = tuple(tuple(row) for row in goal)
 
-#     if not is_solvable(start, goal):
-#         return {"found": False, "moves": "", "expanded": 0,
-#                 "max_queue_size": 0, "time_taken": time.process_time() - start_time}
+    if not is_solvable(start, goal):
+        return {"found": False, "moves": "", "expanded": 0,
+                "max_queue_size": 0, "time_taken": time.process_time() - start_time}
 
-#     if is_goal(start, goal):
-#         return {"found": True, "moves": "", "expanded": 0,
-#                 "max_queue_size": 1, "time_taken": time.process_time() - start_time}
+    if is_goal(start, goal):
+        return {"found": True, "moves": "", "expanded": 0,
+                "max_queue_size": 1, "time_taken": time.process_time() - start_time}
 
-#     counter = count()
-#     open_queue = []
-#     open_costs = {start: 0}
-#     best_costs = {start: 0}
-#     closed = set()
-#     parents = {}
-#     heapq.heappush(open_queue, (heuristic(start), next(counter), 0, start))
-#     expanded = 0
-#     max_queue_size = 1
+    counter = count()
+    open_queue = []
+    open_costs = {start: 0}
+    best_costs = {start: 0}
+    closed = set()
+    parents = {}
+    heapq.heappush(open_queue, (heuristic(start), next(counter), 0, start))
+    expanded = 0
+    max_queue_size = 1
 
-#     while open_queue:
-#         priority, _, cost, current = heapq.heappop(open_queue)
-#         # Ignore outdated heap entries for states improved in the meantime.
-#         if open_costs.get(current) != cost:
-#             continue
-#         del open_costs[current]
-#         closed.add(current)
-#         expanded += 1
+    while open_queue:
+        priority, _, cost, current = heapq.heappop(open_queue)
+        # Ignore outdated heap entries for states improved in the meantime.
+        if open_costs.get(current) != cost:
+            continue
+        del open_costs[current]
+        closed.add(current)
+        expanded += 1
 
-#         if is_goal(current, goal):
-#             path = []
-#             while current != start:
-#                 current, move = parents[current]
-#                 path.append(move)
-#             return {"found": True, "moves": "".join(reversed(path)),
-#                     "expanded": expanded, "max_queue_size": max_queue_size,
-#                     "time_taken": time.process_time() - start_time}
+        if is_goal(current, goal):
+            path = []
+            while current != start:
+                current, move = parents[current]
+                path.append(move)
+            return {"found": True, "moves": "".join(reversed(path)),
+                    "expanded": expanded, "max_queue_size": max_queue_size,
+                    "time_taken": time.process_time() - start_time}
 
-#         for move, next_state in generate_moves(current):
-#             new_cost = cost + 1
-#             if new_cost >= best_costs.get(next_state, float("inf")):
-#                 continue
-#             best_costs[next_state] = new_cost
-#             parents[next_state] = (current, move)
-#             if next_state in closed:
-#                 closed.remove(next_state)
-#             open_costs[next_state] = new_cost
-#             heapq.heappush(open_queue, (
-#                 new_cost + heuristic(next_state), next(counter), new_cost, next_state
-#             ))
-#             max_queue_size = max(max_queue_size, len(open_costs))
+        for move, next_state in generate_moves(current):
+            new_cost = cost + 1
+            if new_cost >= best_costs.get(next_state, float("inf")):
+                continue
+            best_costs[next_state] = new_cost
+            parents[next_state] = (current, move)
+            if next_state in closed:
+                closed.remove(next_state)
+            open_costs[next_state] = new_cost
+            heapq.heappush(open_queue, (
+                new_cost + heuristic(next_state), next(counter), new_cost, next_state
+            ))
+            max_queue_size = max(max_queue_size, len(open_costs))
 
-#     return {"found": False, "moves": "", "expanded": expanded,
-#             "max_queue_size": max_queue_size,
-#             "time_taken": time.process_time() - start_time}
+    return {"found": False, "moves": "", "expanded": expanded,
+            "max_queue_size": max_queue_size,
+            "time_taken": time.process_time() - start_time}
 
 
 def is_solvable(start, goal):
