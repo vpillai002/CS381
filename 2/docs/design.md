@@ -1,4 +1,6 @@
-# Project 2 - Sliding Tile Puzzle
+# Project 2
+
+## Sliding Tile Puzzle
 
 ### Team Members
 
@@ -7,10 +9,10 @@
 
 ### Build & Run Instructions
 
-From the project director, run tests directly with:
+From the project directory, run tests directly with:
 
 ```
-python3 -c "import test_search; [getattr(test_search, n)() for n in sorted(dir(test_search)) if n.startswith('test_')]; print('All tests passed')"
+python3 -c "import unittest, test_project2; result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromModule(test_project2)); print('All tests passed' if result.wasSuccessful() else 'Tests failed'); raise SystemExit(not result.wasSuccessful())"
 ```
 
 Example Input:
@@ -191,13 +193,15 @@ optimal path length for all three heuristics, move labels, parity rejection,
 and a 3x3 board. Run them from this directory with:
 
 ```bash
-pytest -q
+python3 -c "import unittest, test_project2; result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromModule(test_project2)); print('All tests passed' if result.wasSuccessful() else 'Tests failed'); raise SystemExit(not result.wasSuccessful())"
 ```
 
 The current test run reports six passing tests. A verified deep-board `h3`
-case is included below; its optimal solution has 34 moves. `h2` can require
-many more expansions on some deep boards, so a complete deep-board `123` run
-has not been verified.
+case is included below; its optimal solution has 34 moves. 
+
+A manual 30 move deep-board run was performed with `123`. This showed that
+`h2` can require many more expansions on some boards. The complete program
+output for this test is shown below.
 
 Goal:
 
@@ -220,19 +224,75 @@ States removed: 1061
 Maximum OPEN size: 979
 ```
 
+### Heuristic Performance Comparison
+
+For the following 4x4 board:
+
+Start:
+
+```text
+[[2, 4, 6, 8], [1, 3, 5, 7], [15, 14, 13, 11], [9, 10, 12, 0]]
+```
+
+Goal:
+
+```text
+[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [14, 13, 15, 0]]
+```
+
+All three hueristics found a solution for the 30 move puzzle:
+
+- The h2 search required many more states and CPU time than h1 and h3.
+
+Program Output for deep board '123' run:
+
+| Heuristic | Moves | States removed | Maximum queue size | CPU time |
+|---|---:|---:|---:|---:|
+| h1 | 30 | 530 | 511 | 0.017022 seconds |
+| h2 | 30 | 5,380,455 | 4,576,089 | 453.954276 seconds |
+| h3 | 30 | 529 | 511 | 0.008231 seconds |
+
+```text
+Enter board size n: 4
+Sliding Tile Puzzle Search
+Enter boards as nested 4x4 lists.
+Start state: [[2, 4, 6, 8], [1, 3, 5, 7], [15, 14, 13, 11], [9, 10, 12, 0]]
+Goal state: [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [14, 13, 15, 0]]
+Choose heuristic(s): 1=h1, 2=h2, 3=h3; enter 4 or 5 to halt: 123
+Best-first search (h1): Solution found.
+Number of moves: 30
+Sequence of moves: RRDRULDLDDRULUURDDLLDRRRULULLU
+Number of states removed: 530
+Maximum size of queue: 511
+CPU time: 0.017022 seconds
+Best-first search (h2): Solution found.
+Number of moves: 30
+Sequence of moves: RRDRULLDDDRULURDLLDRRRULUULDLU
+Number of states removed: 5380455
+Maximum size of queue: 4576089
+CPU time: 453.954276 seconds
+Best-first search (h3): Solution found.
+Number of moves: 30
+Sequence of moves: RRDRULDLDDRULUURDDLLDRRRULULLU
+Number of states removed: 529
+Maximum size of queue: 511
+CPU time: 0.008231 seconds
+```
+
+
 ### File Structure
 
 The project files are organized as follows:
 
 ```text
-1/
+2/
 ├──/docs
     ├── design.md
     ├── ai_transcript.md
     ├── cs381-project2-Fa26-final.pdf
     ├── Sliding_Puzzle_Astar_Test_Results.pdf
 ├── project2.py
-└── test_search.py
+└── test_project2.py
 ```
 
 ### AI Support
@@ -248,9 +308,9 @@ explanations and gave feedback on Will's answers. This helped him to write his o
 version that used the project 1 implementation as a template for the remaining program.
 The interactive process helped him work through the A* implementation. 
 
-AI assistance was not used to for the final submitted Python implementation.
+AI assistance was not used for the final submitted Python implementation.
 
-The transcript of that AI supported practice project is included in:
+The transcript for the AI input and assistance on building that practice project is included in:
 
 - `docs/ai_transcript.md`
 
