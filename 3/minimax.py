@@ -74,7 +74,6 @@ def board_from_rows(rows: list[list[int]]) -> Board:
             if value not in (EMPTY, 1, 2):
                 raise ValueError("Board entries must be 0, 1, or 2.")
     
-    # TODO Make and return an independent copy of rows:
     return copy_board(rows)
 
 
@@ -209,65 +208,35 @@ def winner(board: Board) -> Optional[int]:
     return None
 
 def check_valid(board: Board) -> tuple[bool, str]:
-    """Check basic reachability conditions required by the assignment.
+    """Check whether the board has valid dimensions, values, and mark counts."""
 
-    Player 1 moves first, so player 1 has either the same number of marks as
-    player 2 or exactly one more.  A board with both players winning is not
-    valid.  The win-detection TODO above must be completed for the win checks
-    here to be meaningful.
-    """
     try:
         board_from_rows(board)
     except ValueError as error:
         return False, str(error)
 
-    # Count Player 1's marks on the board
     count_1 = 0
+    count_2 = 0
+
     for row in board:
         for value in row:
             if value == 1:
-                count_1 = count_2 + 1
-
-    # Count Player 2's marks on the board
-    count_2 = 0
-    for row in board:
-        for value in row:
-            if value == 2:
+                count_1 = count_1 + 1
+            elif value == 2:
                 count_2 = count_2 + 1
 
-    # Player 1 goes first so their count must match Player 2's
-    # or be exactly one higher
+    # Player 1 moves first, so the counts must be equal,
+    # or Player 1 may have exactly one extra mark.
+    if count_1 < count_2 or count_1 > count_2 + 1:
+        return False, "Player 1 must have the same number of marks as Player 2 or one more."
 
-    if count_1 < count_2:
-        return False, "Player 2 cannot have must have more marks than player 1."
-
-    if count_1 > count_2:
-        return False, "Player 1 cannot have more than one extra mark."
-    
-    # A valid game cannot have both players winning
     player_1_wins = winning_squares(board, 1)
     player_2_wins = winning_squares(board, 2)
 
     if player_1_wins and player_2_wins:
-        return False, "Both players cannot have winning sets on a valid board"
+        return False, "Both players cannot have winning sets on a valid board."
 
-    if player_1_wins:
-        return True, "valid"
-        
     return True, "valid"
-
-
-def ordered_moves(board: Board) -> list[Move]:
-    """Return legal moves in the tie-breaking order required by the project."""
-    moves = legal_moves(board)
-
-    # TODO (move-ordering learning line): choose an ordering that is useful for
-    # alpha-beta pruning while preserving row/column tie-breaking.  The simple
-    # row-major ordering below is intentionally only a safe starting point.
-
-    # Sort by row, then by column,
-    moves.sort()
-    return moves
 
 
 def count_winning_sets(board: Board, mark: int) -> int:
@@ -343,7 +312,7 @@ def minimax(board: Board, current_player: int, root_player: int) -> SearchResult
     nodes_expanded = 1
 
     # Search each child position
-    for move in ordered_moves(board):
+    for move in legal_moves(board):
         child_position = apply_move(board, move, current_player)
         next_player = 3 - current_player
 
@@ -402,7 +371,7 @@ def minimax_cutoff(board: Board, current_player: int, root_player: int, depth: i
     best_move = None
     nodes_expanded = 1
 
-    for move in ordered_moves(board):
+    for move in legal_moves(board):
         child_board = apply_move(board, move, current_player)
         next_player = 3 - current_player
         child_depth = current_depth + 1
@@ -480,7 +449,7 @@ def minimax_alpha_beta_cutoff(
     best_move = None
     nodes_expanded = 1
 
-    for move in ordered_moves(board):
+    for move in legal_moves(board):
         child_board = apply_move(board, move, current_player)
         next_player = 3 - current_player
         child_depth = current_depth + 1
@@ -542,7 +511,7 @@ def read_board() -> Board:
             raise ValueError("Each row must contain exactly four integers.")
 
         row = []
-        for value in value:
+        for value in values:
             number = int(value)
             row.append(number)
 
@@ -571,45 +540,120 @@ def play_game() -> None:
     """Menu placeholder for the human vs computer game loop."""
 
     print("Game-loop framework selected.")
-    print("TODO: ask who moves first, alternate turns, and stop at win/draw.")
+    board = new_board()
+
+    answer = input("Do you want to play first? (y/n): ")
+
+    if answer.lower() == "y":
+        human_player = 1
+    else:
+        human_player = 2
+
+    computer_player = 3 - human_player
+
+    depth = int(input("How many moves ahead should the computer search?"))
+
+    current_player = 1
+
+    display_board(board)
+
+    while winner(board) is None and not is_full(board):
+        if (human_player == current_player):
+            row = int(input("Choose a row (1-4): ")) - 1
+            column = int(input("Choose a column (1-4): ")) - 1
+            move = (row, column)
+        else:
+            result = minimax_alpha_beta_cutoff(
+                board, 
+                current_player, 
+                computer_player, 
+                depth
+            )
+            move = result.move
+
+        board = apply_move(board, move, current_player)
+        display_board(board)
+        current_player = 3 - current_player
+
+        winner_found = winner(board)
+
+    if winner_found is None:
+        print("The game is a draw.")
+    else:
+        print(f"The winner is {winner_found}")
 
 
 def main() -> None:
-    """Run the assignment's menu until Option 5 is selected."""
+    """Run the menu until the user chooses Option 5."""
+
     while True:
         print("\n0/4: play against computer")
         print("1: complete minimax")
         print("2: cutoff alpha-beta")
         print("3: compare cutoff minimax and alpha-beta")
         print("5: exit")
+
         choice = input("Choose an option: ").strip()
 
         try:
             if choice in ("0", "4"):
                 play_game()
-            elif choice == "1":
+
+            elif choice in ("1", "2", "3"):
                 board = read_board()
                 valid, message = check_valid(board)
+
                 if not valid:
                     print(f"Invalid board: {message}")
                 else:
-                    print_result(minimax(board, 1))
-            elif choice == "2":
-                board = read_board()
-                depth = int(input("Cutoff depth k: "))
-                print_result(minimax_alpha_beta_cutoff(board, 1, depth))
-            elif choice == "3":
-                board = read_board()
-                depth = int(input("Cutoff depth k: "))
-                print("Minimax cutoff:")
-                print_result(minimax_cutoff(board, 1, depth))
-                print("Alpha-beta cutoff:")
-                print_result(minimax_alpha_beta_cutoff(board, 1, depth))
+                    count_1 = 0
+                    count_2 = 0
+
+                    for row in board:
+                        for value in row:
+                            if value == 1:
+                                count_1 = count_1 + 1
+                            elif value == 2:
+                                count_2 = count_2 + 1
+
+                    if count_1 == count_2:
+                        current_player = 1
+                    else:
+                        current_player = 2
+
+                    if choice == "1":
+                        result = minimax(board, current_player, 1)
+                        print_result(result)
+
+                    else:
+                        depth = int(input("Cutoff depth k: "))
+
+                        if choice == "2":
+                            result = minimax_alpha_beta_cutoff(
+                                board, current_player, 1, depth
+                            )
+                            print_result(result)
+
+                        else:
+                            print("Minimax cutoff:")
+                            result = minimax_cutoff(
+                                board, current_player, 1, depth
+                            )
+                            print_result(result)
+
+                            print("Alpha-beta cutoff:")
+                            result = minimax_alpha_beta_cutoff(
+                                board, current_player, 1, depth
+                            )
+                            print_result(result)
+
             elif choice == "5":
                 print("Goodbye.")
                 return
+
             else:
                 print("Please choose one of the listed options.")
+
         except (ValueError, EOFError) as error:
             print(f"Input error: {error}")
 
