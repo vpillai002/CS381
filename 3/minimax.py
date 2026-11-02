@@ -21,6 +21,7 @@ from dataclasses import dataclass # For creating classes to store data
 from itertools import combinations # 
 from time import perf_counter
 from typing import Optional
+import ast
 
 
 SIZE = 4
@@ -58,7 +59,6 @@ def copy_board(board: Board) -> Board:
 
     return copied_board
 
-
 def board_from_rows(rows: list[list[int]]) -> Board:
     """Validate and copy rows supplied by a caller or by the menu."""
     
@@ -76,7 +76,6 @@ def board_from_rows(rows: list[list[int]]) -> Board:
     
     return copy_board(rows)
 
-
 def display_board(board: Board) -> None:
     """Print a board with one based labels that match the assignment."""
 
@@ -93,7 +92,6 @@ def display_board(board: Board) -> None:
         print()
         row_number = row_number + 1
 
-
 def is_full(board: Board) -> bool:
     """Return True when no square is empty."""
 
@@ -103,7 +101,6 @@ def is_full(board: Board) -> bool:
                 return False
 
     return True
-
 
 def legal_moves(board: Board) -> list[Move]:
     """Return all currently empty squares in row major order."""
@@ -116,7 +113,6 @@ def legal_moves(board: Board) -> list[Move]:
                 moves.append((row, column))
 
     return moves
-
 
 def apply_move(board: Board, move: Move, player: int) -> Board:
     """Return a new board with the player's mark added"""
@@ -150,7 +146,6 @@ def apply_move(board: Board, move: Move, player: int) -> Board:
 
 # display_board(board)
 # display_board(updated)
-
 
 def winning_squares(board: Board, player: int) -> list[Move]:
     """Return one winning set, or an empty list if player has no win.
@@ -186,7 +181,6 @@ def winning_squares(board: Board, player: int) -> list[Move]:
 
     # No winning group was found.
     return []
-
 
 def winner(board: Board) -> Optional[int]:
     """Return the winning player, or None when neither player has won."""
@@ -237,7 +231,6 @@ def check_valid(board: Board) -> tuple[bool, str]:
         return False, "Both players cannot have winning sets on a valid board."
 
     return True, "valid"
-
 
 def count_winning_sets(board: Board, mark: int) -> int:
     # Count the possible winning sets for mark
@@ -404,7 +397,6 @@ def minimax_cutoff(board: Board, current_player: int, root_player: int, depth: i
         perf_counter() - start
     )
 
-
 def minimax_alpha_beta_cutoff(
     board: Board,
     current_player: int,
@@ -496,29 +488,13 @@ def minimax_alpha_beta_cutoff(
         perf_counter() - start
     )
 
-
 def read_board() -> Board:
-    """Read four rows of four integers from the user."""
+    """Read a whole board entered as a list of rows."""
+    text = input("Enter the board, for example [[1, 0, 0, 0], ...]: ")
 
-    print("Enter four rows, each containing four values (0, 1, or 2).")
-    rows = []
-
-    for row_number in range(1, SIZE + 1):
-        row_text = input(f"Row {row_number}: ")
-        values = row_text.split()
-
-        if len(values) != SIZE:
-            raise ValueError("Each row must contain exactly four integers.")
-
-        row = []
-        for value in values:
-            number = int(value)
-            row.append(number)
-
-        rows.append(row)
+    rows = ast.literal_eval(text)
 
     return board_from_rows(rows)
-
 
 def print_result(result: SearchResult) -> None:
     """Print the search results"""
@@ -534,7 +510,6 @@ def print_result(result: SearchResult) -> None:
     print(f"Best move (row, column): {move_text}")
     print(f"Nodes expanded: {result.nodes_expanded}")
     print(f"CPU time: {result.cpu_time:.6f} seconds")
-
 
 def play_game() -> None:
     """Menu placeholder for the human vs computer game loop."""
@@ -581,7 +556,6 @@ def play_game() -> None:
         print("The game is a draw.")
     else:
         print(f"The winner is {winner_found}")
-
 
 def main() -> None:
     """Run the menu until the user chooses Option 5."""
