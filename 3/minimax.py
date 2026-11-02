@@ -1,30 +1,23 @@
-"""Starter framework for CS 381 Project 3.
-
-This file is intentionally NOT a complete submission.  The program structure,
-board helpers, menu, and measurement scaffolding are provided so that the
-remaining search logic can be implemented and explained by the student.
-
-Board convention:
-    * A board is a list of four lists, each containing four integers.
-    * 0 means empty; 1 and 2 are the players.
-    * User-facing row and column numbers start at 1.
-    * Internally, Python indexes start at 0.
-
-The assignment's duplicate descriptions of Options 0 and 4, and its reference
-to both MinimaxAlphaBeta and MinimaxAlphaBetaCutOff, are documented in the menu
-comments below.  This framework treats Option 0 and Option 4 as aliases for a
-human-vs-computer game, and uses the cutoff alpha-beta function for Options 2
-and 3.
-"""
-
 from dataclasses import dataclass # For creating classes to store data
-from itertools import combinations # 
-from time import perf_counter
+from itertools import permutations
+from time import process_time
 from typing import Optional
 import ast
 
 
 SIZE = 4
+
+WINNING_PATTERNS = []
+
+for columns in permutations(range(SIZE)):
+    pattern = []
+
+    for row in range(SIZE):
+        column = columns[row]
+        pattern.append((row, column))
+
+    WINNING_PATTERNS.append(pattern)
+
 EMPTY = 0
 PLAYERS = (1, 2)
 Board = list[list[int]]
@@ -102,8 +95,8 @@ def is_full(board: Board) -> bool:
 
     return True
 
-def legal_moves(board: Board) -> list[Move]:
-    """Return all currently empty squares in row major order."""
+def ordered_moves(board: Board) -> list[Move]:
+    """Return empty squares in row-major order for tie-breaking."""
 
     moves = []
 
@@ -136,50 +129,20 @@ def apply_move(board: Board, move: Move, player: int) -> Board:
 
     return result
 
-# Test function:
-# board = new_board()
-
-# updated = apply_move(board, (1, 2), 1)
-
-# print(board[1][2])    # should print 0
-# print(updated[1][2])  # should print 1
-
-# display_board(board)
-# display_board(updated)
-
 def winning_squares(board: Board, player: int) -> list[Move]:
-    """Return one winning set, or an empty list if player has no win.
+    """Return one winning set, or an empty list if there is no win."""
 
-    A win is four marked squares with four distinct rows and four distinct
-    columns.  This is not limited to the usual Tic-tac-toe lines.
-    """
-    # Collect the coordinates of every square owned by this player.
-    owned = []
+    for pattern in WINNING_PATTERNS:
+        pattern_is_winning = True
 
-    for row in range(SIZE):
-        for column in range(SIZE):
-            if board[row][column] == player:
-                owned.append((row, column))
+        for row, column in pattern:
+            if board[row][column] != player:
+                pattern_is_winning = False
+                break
 
+        if pattern_is_winning:
+            return pattern
 
-    # Try every possible group of four owned squares.
-    for candidate in combinations(owned, SIZE):
-        rows = set()
-        columns = set()
-
-        for square in candidate:
-            row = square[0]
-            column = square[1]
-
-            rows.add(row)
-            columns.add(column)
-
-        # TODO: Check that the group uses all four rows
-        # and all four columns.
-        if len(rows) == SIZE and len(columns) == SIZE:
-            return list(candidate)
-
-    # No winning group was found.
     return []
 
 def winner(board: Board) -> Optional[int]:
@@ -230,35 +193,30 @@ def check_valid(board: Board) -> tuple[bool, str]:
     if player_1_wins and player_2_wins:
         return False, "Both players cannot have winning sets on a valid board."
 
+    # The winner must be the player who made the most recent move.
+    # Player 1 moves first, so Player 1 wins only with one extra mark,
+    # while Player 2 wins only when both players have the same count.
+    if player_1_wins and count_1 != count_2 + 1:
+        return False, "Player 1 can only win after making one more move than Player 2."
+
+    if player_2_wins and count_1 != count_2:
+        return False, "Player 2 can only win when both players have the same number of marks."
+
     return True, "valid"
 
 def count_winning_sets(board: Board, mark: int) -> int:
-    # Count the possible winning sets for mark
-    available_squares = []
-
-    for row in range(SIZE):
-        for column in range(SIZE):
-            if board[row][column] == EMPTY or board[row][column] == mark:
-                available_squares.append((row, column))
-
     number_of_sets = 0
 
-    # Try every group of four squares the player could use.
-    for candidate in combinations(available_squares, SIZE):
-        rows_used = set()
-        columns_used = set()
+    for pattern in WINNING_PATTERNS:
+        possible = True
 
-        # Record which rows and columns this group uses.
-        for square in candidate:
-            row = square[0]
-            column = square[1]
+        for row, column in pattern:
+            if board[row][column] not in (EMPTY, mark):
+                possible = False
+                break
 
-            rows_used.add(row)
-            columns_used.add(column)
-
-        # It is a possible winning set if all rows and columns differ.
-        if len(rows_used) == SIZE and len(columns_used) == SIZE:
-            number_of_sets = number_of_sets + 1
+        if possible:
+            number_of_sets += 1
 
     return number_of_sets
 
@@ -281,19 +239,19 @@ class SearchResult:
 def minimax(board: Board, current_player: int, root_player: int) -> SearchResult:
     """Search the game tree."""
 
-    start = perf_counter()
+    start = process_time()
 
     # If the game is over, return its exact result.
     winner_found = winner(board)
 
     if winner_found == root_player:
-        return SearchResult(1, None, 0, perf_counter() - start)
+        return SearchResult(1, None, 0, process_time() - start)
 
     if winner_found is not None:
-        return SearchResult(-1, None, 0, perf_counter() - start)
+        return SearchResult(-1, None, 0, process_time() - start)
 
     if is_full(board):
-        return SearchResult(0, None, 0, perf_counter() - start)
+        return SearchResult(0, None, 0, process_time() - start)
 
     # Initialize the value for a MAX or MIN node position.
     if current_player == root_player:
@@ -305,7 +263,7 @@ def minimax(board: Board, current_player: int, root_player: int) -> SearchResult
     nodes_expanded = 1
 
     # Search each child position
-    for move in legal_moves(board):
+    for move in ordered_moves(board):
         child_position = apply_move(board, move, current_player)
         next_player = 3 - current_player
 
@@ -325,7 +283,7 @@ def minimax(board: Board, current_player: int, root_player: int) -> SearchResult
         value,
         best_move,
         nodes_expanded,
-        perf_counter() - start
+        process_time() - start
     )
 
 def minimax_cutoff(board: Board, current_player: int, root_player: int, depth: int, 
@@ -335,25 +293,25 @@ def minimax_cutoff(board: Board, current_player: int, root_player: int, depth: i
     if depth <= 0:
         raise ValueError("Cutoff depth must be a positive integer.")
     
-    start = perf_counter()
+    start = process_time()
 
     winner_found = winner(board)
 
     if winner_found == root_player:
-        return SearchResult(1, None, 0, perf_counter() - start)
+        return SearchResult(1, None, 0, process_time() - start)
 
     if winner_found is not None:
-        return SearchResult(-1, None, 0, perf_counter() - start)
+        return SearchResult(-1, None, 0, process_time() - start)
 
     if is_full(board):
-        return SearchResult(0, None, 0, perf_counter() - start)
+        return SearchResult(0, None, 0, process_time() - start)
 
     if current_depth >= depth:
         return SearchResult(
             evaluate(board, root_player),
             None,
             0,
-            perf_counter() - start
+            process_time() - start
         )
 
     if current_player == root_player:
@@ -364,7 +322,7 @@ def minimax_cutoff(board: Board, current_player: int, root_player: int, depth: i
     best_move = None
     nodes_expanded = 1
 
-    for move in legal_moves(board):
+    for move in ordered_moves(board):
         child_board = apply_move(board, move, current_player)
         next_player = 3 - current_player
         child_depth = current_depth + 1
@@ -394,7 +352,7 @@ def minimax_cutoff(board: Board, current_player: int, root_player: int, depth: i
         value,
         best_move,
         nodes_expanded,
-        perf_counter() - start
+        process_time() - start
     )
 
 def minimax_alpha_beta_cutoff(
@@ -412,25 +370,25 @@ def minimax_alpha_beta_cutoff(
     if depth <= 0:
         raise ValueError("Cutoff depth must be a positive integer.")
     
-    start = perf_counter()
+    start = process_time()
 
     winner_found = winner(board)
 
     if winner_found == root_player:
-        return SearchResult(1, None, 0, perf_counter() - start)
+        return SearchResult(1, None, 0, process_time() - start)
 
     if winner_found is not None:
-        return SearchResult(-1, None, 0, perf_counter() - start)
+        return SearchResult(-1, None, 0, process_time() - start)
 
     if is_full(board):
-        return SearchResult(0, None, 0, perf_counter() - start)
+        return SearchResult(0, None, 0, process_time() - start)
 
     if current_depth >= depth:
         return SearchResult(
             evaluate(board, root_player),
             None,
             0,
-            perf_counter() - start
+            process_time() - start
         )
 
     if current_player == root_player:
@@ -441,7 +399,7 @@ def minimax_alpha_beta_cutoff(
     best_move = None
     nodes_expanded = 1
 
-    for move in legal_moves(board):
+    for move in ordered_moves(board):
         child_board = apply_move(board, move, current_player)
         next_player = 3 - current_player
         child_depth = current_depth + 1
@@ -485,7 +443,7 @@ def minimax_alpha_beta_cutoff(
         value,
         best_move,
         nodes_expanded,
-        perf_counter() - start
+        process_time() - start
     )
 
 def read_board() -> Board:
@@ -511,12 +469,58 @@ def print_result(result: SearchResult) -> None:
     print(f"Nodes expanded: {result.nodes_expanded}")
     print(f"CPU time: {result.cpu_time:.6f} seconds")
 
-def play_game() -> None:
-    """Menu placeholder for the human vs computer game loop."""
+def run_game(board, human_player, depth):
+    """Play a game from the given board."""
 
-    print("Game-loop framework selected.")
+    computer_player = 3 - human_player
+
+    # Count the marks to find whose turn is next.
+    count_1 = 0
+    count_2 = 0
+
+    for row in board:
+        for value in row:
+            if value == 1:
+                count_1 = count_1 + 1
+            elif value == 2:
+                count_2 = count_2 + 1
+
+    if count_1 == count_2:
+        current_player = 1
+    else:
+        current_player = 2
+
+    display_board(board)
+
+    while winner(board) is None and not is_full(board):
+        if current_player == human_player:
+            row = int(input("Choose a row (1-4): ")) - 1
+            column = int(input("Choose a column (1-4): ")) - 1
+            move = (row, column)
+        else:
+            result = minimax_alpha_beta_cutoff(
+                board,
+                current_player,
+                computer_player,
+                depth
+            )
+            move = result.move
+
+        board = apply_move(board, move, current_player)
+        display_board(board)
+
+        current_player = 3 - current_player
+
+    winner_found = winner(board)
+
+    if winner_found is None:
+        print("The game is a draw.")
+    else:
+        print(f"The winner is {winner_found}")
+
+def play_new_game() -> None:
+
     board = new_board()
-
     answer = input("Do you want to play first? (y/n): ")
 
     if answer.lower() == "y":
@@ -524,54 +528,60 @@ def play_game() -> None:
     else:
         human_player = 2
 
-    computer_player = 3 - human_player
+    if human_player != 1 and human_player != 2:
+        print("Please choose Player 1 or Player 2.")
+        return
 
     depth = int(input("How many moves ahead should the computer search?"))
 
-    current_player = 1
+    if depth <= 0:
+        print("Search depth must be greater than 0.")
+        return
+    
+    run_game(board, human_player, depth)
 
-    display_board(board)
+def play_existing_game() -> None:
+    board = read_board()
 
-    while winner(board) is None and not is_full(board):
-        if (human_player == current_player):
-            row = int(input("Choose a row (1-4): ")) - 1
-            column = int(input("Choose a column (1-4): ")) - 1
-            move = (row, column)
-        else:
-            result = minimax_alpha_beta_cutoff(
-                board, 
-                current_player, 
-                computer_player, 
-                depth
-            )
-            move = result.move
+    valid, message = check_valid(board)
 
-        board = apply_move(board, move, current_player)
-        display_board(board)
-        current_player = 3 - current_player
+    if not valid:
+        print(f"Invalid board: {message}")
+        return
 
-        winner_found = winner(board)
+    human_player = int(input("Do you want to be Player 1 or Player 2? "))
 
-    if winner_found is None:
-        print("The game is a draw.")
-    else:
-        print(f"The winner is {winner_found}")
+    if human_player != 1 and human_player != 2:
+        print("Please choose Player 1 or Player 2.")
+        return
+
+    depth = int(input("How many moves ahead should the computer search? "))
+
+    if depth <= 0:
+        print("Search depth must be greater than 0.")
+        return
+
+    run_game(board, human_player, depth)
 
 def main() -> None:
     """Run the menu until the user chooses Option 5."""
 
     while True:
-        print("\n0/4: play against computer")
+        print("\n0: play against computer - New game")
         print("1: complete minimax")
         print("2: cutoff alpha-beta")
         print("3: compare cutoff minimax and alpha-beta")
+        print("4: play against the computer with a user entered board")
         print("5: exit")
 
         choice = input("Choose an option: ").strip()
 
         try:
-            if choice in ("0", "4"):
-                play_game()
+            if choice == "0":
+                play_new_game()
+
+            elif choice == "4":
+                play_existing_game()
 
             elif choice in ("1", "2", "3"):
                 board = read_board()
@@ -579,47 +589,59 @@ def main() -> None:
 
                 if not valid:
                     print(f"Invalid board: {message}")
+                    continue
+
+                count_1 = 0
+                count_2 = 0
+
+                for row in board:
+                    for value in row:
+                        if value == 1:
+                            count_1 += 1
+                        elif value == 2:
+                            count_2 += 1
+
+                if count_1 == count_2:
+                    current_player = 1
                 else:
-                    count_1 = 0
-                    count_2 = 0
+                    current_player = 2
 
-                    for row in board:
-                        for value in row:
-                            if value == 1:
-                                count_1 = count_1 + 1
-                            elif value == 2:
-                                count_2 = count_2 + 1
+                if choice == "1":
+                    # Complete minimax reports the value from Player 1's perspective.
+                    result = minimax(board, current_player, 1)
+                    print_result(result)
 
-                    if count_1 == count_2:
-                        current_player = 1
-                    else:
-                        current_player = 2
+                else:
+                    depth = int(input("Cutoff depth k: "))
 
-                    if choice == "1":
-                        result = minimax(board, current_player, 1)
+                    if choice == "2":
+                        # Cutoff alpha-beta reports the value for the current player.
+                        result = minimax_alpha_beta_cutoff(
+                            board,
+                            current_player,
+                            current_player,
+                            depth
+                        )
                         print_result(result)
 
                     else:
-                        depth = int(input("Cutoff depth k: "))
+                        print("Minimax cutoff:")
+                        result = minimax_cutoff(
+                            board,
+                            current_player,
+                            current_player,
+                            depth
+                        )
+                        print_result(result)
 
-                        if choice == "2":
-                            result = minimax_alpha_beta_cutoff(
-                                board, current_player, 1, depth
-                            )
-                            print_result(result)
-
-                        else:
-                            print("Minimax cutoff:")
-                            result = minimax_cutoff(
-                                board, current_player, 1, depth
-                            )
-                            print_result(result)
-
-                            print("Alpha-beta cutoff:")
-                            result = minimax_alpha_beta_cutoff(
-                                board, current_player, 1, depth
-                            )
-                            print_result(result)
+                        print("Alpha-beta cutoff:")
+                        result = minimax_alpha_beta_cutoff(
+                            board,
+                            current_player,
+                            current_player,
+                            depth
+                        )
+                        print_result(result)
 
             elif choice == "5":
                 print("Goodbye.")
@@ -628,7 +650,7 @@ def main() -> None:
             else:
                 print("Please choose one of the listed options.")
 
-        except (ValueError, EOFError) as error:
+        except (ValueError, SyntaxError, EOFError) as error:
             print(f"Input error: {error}")
 
 
