@@ -174,10 +174,27 @@ minutes, so this test run does not verify if those are fully functional.
 
 ### Performance Comparison
 
+**Complete Minimax**
+Choose an option: 1
+Enter the board, for example [[1, 0, 0, 0], ...]: [[1, 2, 1, 2],[2, 1, 2, 0],[1, 0, 0, 0],[0, 0, 0, 0]]
+Value: 1
+Best move (row, column): (2, 4)
+Nodes expanded: 10725
+CPU time: 0.104133 seconds
 
+**Cutoff Alpha-Beta**
+Choose an option: 2
+Enter the board, for example [[1, 0, 0, 0], ...]: [[0,0,0,0], [0,0,0,0], [0,0,0,0], [0,0,0,0]]
+Cutoff depth k: 8
+Value: 0
+Best move (row, column): (1, 1)
+Nodes expanded: 71741
+CPU time: 1.128064 seconds
 
+**Compare Cutoff Minimax and Alpha-Beta**
 Choose an option: 3
 Enter the board, for example [[1, 0, 0, 0], ...]: [[0,1,0,0],[0,0,2,0],[0,0,0,0],[0,1,0,2]]
+// This board at depth 6 returns -1, not 4 per the test cases file.
 Cutoff depth k: 8
 Minimax cutoff:
 Value: 0
@@ -219,10 +236,10 @@ The transcript for the AI input and assistance on building the project is includ
 
 **Will Meyer**
 
-- Built ...
+- Built the core starter for the project. Attempted to code the algorithm and worked with AI to debug the final result.
 
 **Vishnu Pillai**
 
-- Responsible for...
+- Responsible for supporting implementation details.
 
 
