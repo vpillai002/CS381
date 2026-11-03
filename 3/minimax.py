@@ -236,83 +236,97 @@ class SearchResult:
     nodes_expanded: int
     cpu_time: float
 
-def minimax(board: Board, current_player: int, root_player: int) -> SearchResult:
-    """Search the game tree."""
-
+def minimax(board, current_player, root_player):
     start = process_time()
 
-    # If the game is over, return its exact result.
-    winner_found = winner(board)
-
-    if winner_found == root_player:
-        return SearchResult(1, None, 0, process_time() - start)
-
-    if winner_found is not None:
-        return SearchResult(-1, None, 0, process_time() - start)
-
-    if is_full(board):
-        return SearchResult(0, None, 0, process_time() - start)
-
-    # Initialize the value for a MAX or MIN node position.
-    if current_player == root_player:
-        value = float("-inf")
-    else:
-        value = float("inf")
-
-    best_move = None
-    nodes_expanded = 1
-
-    # Search each child position
-    for move in ordered_moves(board):
-        child_position = apply_move(board, move, current_player)
-        next_player = 3 - current_player
-
-        child_result = minimax(child_position, next_player, root_player)
-
-        # MAX keeps the larger value. MIN keeps the smaller value.
-        if current_player == root_player:
-            if child_result.value > value:
-                value = child_result.value
-                best_move = move
-        else:
-            if child_result.value < value:
-                value = child_result.value
-                best_move = move
+    value, move, nodes_expanded = minimax_search(
+        board, current_player, root_player
+    )
 
     return SearchResult(
         value,
-        best_move,
+        move,
         nodes_expanded,
         process_time() - start
     )
 
-def minimax_cutoff(board: Board, current_player: int, root_player: int, depth: int, 
-                   current_depth: int = 0) -> SearchResult:
-    """Search to depth plies using evaluate at the cutoff depth."""
-
-    if depth <= 0:
-        raise ValueError("Cutoff depth must be a positive integer.")
-    
-    start = process_time()
+def minimax_search(board, current_player, root_player):
+    # No process_time() here
 
     winner_found = winner(board)
 
     if winner_found == root_player:
-        return SearchResult(1, None, 0, process_time() - start)
+        return 1, None, 0
 
     if winner_found is not None:
-        return SearchResult(-1, None, 0, process_time() - start)
+        return -1, None, 0
 
     if is_full(board):
-        return SearchResult(0, None, 0, process_time() - start)
+        return 0, None, 0
+
+    value = float("-inf") if current_player == root_player else float("inf")
+    best_move = None
+    nodes_expanded = 1
+
+    for move in ordered_moves(board):
+        child = apply_move(board, move, current_player)
+
+        child_value, unused_move, child_nodes = minimax_search(
+            child, 3 - current_player, root_player
+        )
+
+        nodes_expanded += child_nodes
+
+        if current_player == root_player and child_value > value:
+            value = child_value
+            best_move = move
+        elif current_player != root_player and child_value < value:
+            value = child_value
+            best_move = move
+
+    return value, best_move, nodes_expanded
+
+def minimax_cutoff(
+    board: Board,
+    current_player: int,
+    root_player: int,
+    depth: int,
+    current_depth: int = 0
+) -> SearchResult:
+    """Start the search and return its result with the total CPU time."""
+
+    if depth <= 0:
+        raise ValueError("Cutoff depth must be a positive integer.")
+
+    start = process_time()
+
+    value, move, nodes = cutoff_search(
+        board, current_player, root_player, depth, current_depth
+    )
+
+    return SearchResult(
+        value,
+        move,
+        nodes,
+        process_time() - start
+    )
+
+def cutoff_search(board, current_player, root_player, depth, current_depth):
+    """Recursively search to the cutoff depth."""
+
+    winner_found = winner(board)
+
+    if winner_found == root_player:
+        return 1, None, 0
+
+    if winner_found is not None:
+        return -1, None, 0
+
+    if is_full(board):
+        return 0, None, 0
 
     if current_depth >= depth:
-        return SearchResult(
-            evaluate(board, root_player),
-            None,
-            0,
-            process_time() - start
-        )
+        return evaluate(board, root_player), None, 0
 
     if current_player == root_player:
         value = float("-inf")
@@ -327,7 +341,7 @@ def minimax_cutoff(board: Board, current_player: int, root_player: int, depth: i
         next_player = 3 - current_player
         child_depth = current_depth + 1
 
-        child_result = minimax_cutoff(
+        child_value, unused_move, child_nodes = cutoff_search(
             child_board,
             next_player,
             root_player,
@@ -335,25 +349,20 @@ def minimax_cutoff(board: Board, current_player: int, root_player: int, depth: i
             child_depth
         )
 
-        nodes_expanded = nodes_expanded + child_result.nodes_expanded
+        nodes_expanded = nodes_expanded + child_nodes
 
         if current_player == root_player:
             # MAX keeps the larger score.
-            if child_result.value > value:
-                value = child_result.value
+            if child_value > value:
+                value = child_value
                 best_move = move
         else:
             # MIN keeps the smaller score.
-            if child_result.value < value:
-                value = child_result.value
+            if child_value < value:
+                value = child_value
                 best_move = move
 
-    return SearchResult(
-        value,
-        best_move,
-        nodes_expanded,
-        process_time() - start
-    )
+    return value, best_move, nodes_expanded
 
 def minimax_alpha_beta_cutoff(
     board: Board,
@@ -364,37 +373,59 @@ def minimax_alpha_beta_cutoff(
     alpha: float = float("-inf"),
     beta: float = float("inf")
 ) -> SearchResult:
-    
-    """Search to depth plies using alpha-beta pruning."""
+    """Start the alpha-beta search and return its result and CPU time."""
 
     if depth <= 0:
         raise ValueError("Cutoff depth must be a positive integer.")
-    
+
     start = process_time()
+
+    value, move, nodes = alpha_beta_search(
+        board,
+        current_player,
+        root_player,
+        depth,
+        current_depth,
+        alpha,
+        beta
+    )
+
+    return SearchResult(
+        value,
+        move,
+        nodes,
+        process_time() - start
+    )
+
+def alpha_beta_search(
+    board,
+    current_player,
+    root_player,
+    depth,
+    current_depth,
+    alpha,
+    beta
+):
+    """Recursively search to the cutoff depth using alpha-beta pruning."""
 
     winner_found = winner(board)
 
     if winner_found == root_player:
-        return SearchResult(1, None, 0, process_time() - start)
+        return 1, None, 0
 
     if winner_found is not None:
-        return SearchResult(-1, None, 0, process_time() - start)
+        return -1, None, 0
 
     if is_full(board):
-        return SearchResult(0, None, 0, process_time() - start)
+        return 0, None, 0
 
     if current_depth >= depth:
-        return SearchResult(
-            evaluate(board, root_player),
-            None,
-            0,
-            process_time() - start
-        )
+        return evaluate(board, root_player), None, 0
 
     if current_player == root_player:
         value = float("-inf")
     else:
-        value = float('inf')
+        value = float("inf")
 
     best_move = None
     nodes_expanded = 1
@@ -404,7 +435,7 @@ def minimax_alpha_beta_cutoff(
         next_player = 3 - current_player
         child_depth = current_depth + 1
 
-        child_result = minimax_alpha_beta_cutoff(
+        child_value, unused_move, child_nodes = alpha_beta_search(
             child_board,
             next_player,
             root_player,
@@ -414,37 +445,32 @@ def minimax_alpha_beta_cutoff(
             beta
         )
 
-        nodes_expanded = nodes_expanded + child_result.nodes_expanded
+        nodes_expanded = nodes_expanded + child_nodes
 
         if current_player == root_player:
-            # MAX keeps the largest child score.
-            if child_result.value > value:
-                value = child_result.value
+            # MAX keeps the largest score.
+            if child_value > value:
+                value = child_value
                 best_move = move
 
-            # Alpha remembers MAX's best score so far.
+            # Alpha is MAX's best score so far.
             if value > alpha:
                 alpha = value
 
         else:
-            # MIN keeps the smallest child score.
-            if child_result.value < value:
-                value = child_result.value
+            # MIN keeps the smallest score.
+            if child_value < value:
+                value = child_value
                 best_move = move
 
-            # Beta remembers MIN's best score so far.
+            # Beta is MIN's best score so far.
             if value < beta:
                 beta = value
-        
+
         if alpha >= beta:
             break
 
-    return SearchResult(
-        value,
-        best_move,
-        nodes_expanded,
-        process_time() - start
-    )
+    return value, best_move, nodes_expanded
 
 def read_board() -> Board:
     """Read a whole board entered as a list of rows."""

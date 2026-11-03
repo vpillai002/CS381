@@ -11,6 +11,10 @@
 
 From the project directory, run tests directly with:
 
+`python3 -m unittest -v test_project.py`
+
+You can also run the program manually with:
+
 `python3 minimax.py`
 
 The program displays a menu. Options 1-3 ask for a board entered as one bracketed list containing four rows, for example:
@@ -124,9 +128,12 @@ The solver uses only Python standard-library modules:
 **Search and user interface functions**
 
 - SearchResult: Stores the value, move, node count, and CPU time returned by a search.
-- minimx: Searches the complete game tree.
-- minimax_cutoff: Searches to a selected depth and evaluates boards at the cutoff.
-- minimax_alpha_beta_cufoff: Performs the depth limited search with alpha-beta pruning.
+- minimax: Times the complete game-tree search, calls minimax_search, and packages its results in a SearchResult.
+- minimax_search: Recursively searches the complete game tree. It returns the value, best move, and node count as a tuple. It does not measure time.
+- minimax_cutoff: Times the depth limited search, calls cutoff_search, and packages its results in a SearchResult.
+- cutoff_search: Recursively searches to the selected depth. At the cutoff, it evaluates the board and returns the value, best move, and node count as a tuple.
+- minimax_alpha_beta_cutoff: Times the depth limited alpha-beta search,calls alpha_beta_search, and packages its results in a SearchResult.
+- alpha_beta_search: Recursively performs depth limited Minimax with alpha-beta pruning. It returns the value, best move, and node count as a tuple. It does not measure time.
 - read_board: Reads a bracketed board and validates its dimensions and values.
 - print_result: Displays the value, selected move, node count, and CPU time.
 - run_game: Runs the human vs computer turn loop.
@@ -146,11 +153,42 @@ Use the menu to select and option. For board search optinos, enter all four rows
 
 ## 4. Test Effort
 
+The program was tested with Python's unittest framework using:
 
+`python3 -m unittest -v test_project.py`
+
+The run completed with 5 tests passing in 5.724 seconds.
+
+The tests checked the following:
+
+- Complete Minimax returned a value of 1 for Player 1 and selected a legal move on the test board.
+- Alpha-beta search on an empty board at depth 8 returned a value of 0 and move (0, 0).
+- Alpha-beta search on the draw test board at depth 8 returned a value of 0.
+- Complete Minimax returned a value of 1 for Player 1 and selected a legal move on another valid board.
+- At depth 6, cutoff Minimax and alpha-beta returned the same value and move. Alpha-beta expanded no more nodes than cutoff Minimax.
+- Each test also checked that the result had a numeric value, an integer node count greater than zero, and a nonnegative CPU time.
+
+The depth(10) and depth(12) empty board searches were not included in this
+test. In those attempts, the searches did not finish within ten
+minutes, so this test run does not verify if those are fully functional.
 
 ### Performance Comparison
 
 
+
+Choose an option: 3
+Enter the board, for example [[1, 0, 0, 0], ...]: [[0,1,0,0],[0,0,2,0],[0,0,0,0],[0,1,0,2]]
+Cutoff depth k: 8
+Minimax cutoff:
+Value: 0
+Best move (row, column): (1, 1)
+Nodes expanded: 3956317
+CPU time: 131.946452 seconds
+Alpha-beta cutoff:
+Value: 0
+Best move (row, column): (1, 1)
+Nodes expanded: 40561
+CPU time: 0.644038 seconds
 
 ### File Structure
 
