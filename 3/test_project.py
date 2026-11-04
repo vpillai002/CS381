@@ -12,9 +12,9 @@ class MinimaxTests(unittest.TestCase):
 
     def test_case_1_minimax_finds_player_1_win(self):
         board = [
-            [1, 2, 1, 2],
-            [2, 1, 2, 0],
             [1, 0, 0, 0],
+            [2, 0, 0, 0],
+            [0, 2, 1, 0],
             [0, 0, 0, 0],
         ]
 

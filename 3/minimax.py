@@ -239,8 +239,14 @@ class SearchResult:
 def minimax(board, current_player, root_player):
     start = process_time()
 
+    # Store board states so we don't have to compute them again.
+    cache = {}
+
     value, move, nodes_expanded = minimax_search(
-        board, current_player, root_player
+        board,
+        current_player,
+        root_player,
+        cache
     )
 
     return SearchResult(
@@ -250,21 +256,39 @@ def minimax(board, current_player, root_player):
         process_time() - start
     )
 
-def minimax_search(board, current_player, root_player):
-    # No process_time() here
+def minimax_search(board, current_player, root_player, cache):
+    board_key = tuple(tuple(row) for row in board)
+    key = (board_key, current_player, root_player)
+
+    # Return the saved answer if this position was already searched.
+    if key in cache:
+        value, move = cache[key]
+
+        # No new node was expanded during this cache lookup.
+        return value, move, 0
 
     winner_found = winner(board)
 
     if winner_found == root_player:
+        result = (1, None)
+        cache[key] = result
         return 1, None, 0
 
     if winner_found is not None:
+        result = (-1, None)
+        cache[key] = result
         return -1, None, 0
 
     if is_full(board):
+        result = (0, None)
+        cache[key] = result
         return 0, None, 0
 
-    value = float("-inf") if current_player == root_player else float("inf")
+    if current_player == root_player:
+        value = float("-inf")
+    else:
+        value = float("inf")
+
     best_move = None
     nodes_expanded = 1
 
@@ -272,17 +296,26 @@ def minimax_search(board, current_player, root_player):
         child = apply_move(board, move, current_player)
 
         child_value, unused_move, child_nodes = minimax_search(
-            child, 3 - current_player, root_player
+            child,
+            3 - current_player,
+            root_player,
+            cache
         )
 
         nodes_expanded += child_nodes
 
-        if current_player == root_player and child_value > value:
-            value = child_value
-            best_move = move
-        elif current_player != root_player and child_value < value:
-            value = child_value
-            best_move = move
+        if current_player == root_player:
+            if child_value > value:
+                value = child_value
+                best_move = move
+        else:
+            if child_value < value:
+                value = child_value
+                best_move = move
+
+    # Cache only the value and move.
+    # The node count belongs to this particular search execution.
+    cache[key] = (value, best_move)
 
     return value, best_move, nodes_expanded
 
@@ -678,7 +711,6 @@ def main() -> None:
 
         except (ValueError, SyntaxError, EOFError) as error:
             print(f"Input error: {error}")
-
 
 
 if __name__ == "__main__":
