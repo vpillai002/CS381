@@ -297,7 +297,7 @@ def read_user_board(prompt_text):
 # Run the interactive program from input prompts to search results.
 def run_cli():
     global BOARD_SIZE
-    BOARD_SIZE = int(input("Enter board size n: "))
+    BOARD_SIZE = int(input("Enter board size n (Dimensions will be n x n): "))
     if BOARD_SIZE < 1:
         raise ValueError("Board size must be at least 1.")
 
